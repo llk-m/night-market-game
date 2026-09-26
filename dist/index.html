@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b2630" />
+    <meta name="description" content="在烟火夜市里合成食材、完成订单的原创 Canvas 小游戏。" />
+    <title>夜市合合乐</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d3b45'/%3E%3Cpath d='M17 26h30l-4 24H21z' fill='%23f3a43b'/%3E%3Cpath d='M21 26c0-10 22-10 22 0' fill='none' stroke='%23fff2cc' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M26 16c-5-7 7-8 2-14M38 16c-5-7 7-8 2-14' fill='none' stroke='%23ff7058' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="preload" href="assets/night-market.png" as="image" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section id="homeScreen" class="home-screen" aria-label="夜市合合乐主页">
+        <div class="home-glow"></div>
+        <header class="home-header">
+          <span class="home-lantern">食</span>
+          <div>
+            <p>烟火夜市经营录</p>
+            <h1>夜市合合乐</h1>
+          </div>
+          <button id="homeSoundBtn" class="home-sound" aria-label="切换音乐和音效"><span>♫</span><small>音乐开</small></button>
+        </header>
+
+        <div class="home-stall">
+          <div class="stall-awning"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="chef-badge">👨‍🍳</div>
+          <div class="home-copy">
+            <small id="homeGreeting">掌柜，今晚也要准时开张</small>
+            <strong>灯亮了，食客正在街口等你</strong>
+          </div>
+          <div class="home-stats">
+            <span><small>掌柜等级</small><b>Lv.<em id="homeLevel">1</em></b></span>
+            <span><small>持有金币</small><b>● <em id="homeCoins">80</em></b></span>
+            <span><small>最高连击</small><b><em id="homeCombo">0</em> 连</b></span>
+          </div>
+          <button id="startGameBtn" class="start-game-btn"><span>继续营业</span><small id="homeProgress">第 1 轮 · 0/6 单</small></button>
+        </div>
+
+        <section class="level-select" aria-labelledby="levelTitle">
+          <div class="home-section-title"><h2 id="levelTitle">两轮一局 · 挑战三星</h2><span>通关解锁下一关</span></div>
+          <div class="level-cards">
+            <button class="level-card selected" data-stage="1"><i>1</i><span><b>长街初灯</b><small>舒缓 · 6 单目标</small></span><em>已选择</em></button>
+            <button class="level-card" data-stage="2"><i>2</i><span><b>雨夜客潮</b><small>急单 · 初始杂物</small></span><em>未解锁</em></button>
+            <button class="level-card" data-stage="3"><i>3</i><span><b>灯会之夜</b><small>极限 · 仅 2 耐心</small></span><em>未解锁</em></button>
+          </div>
+        </section>
+
+        <section class="how-to-home" aria-labelledby="howTitle">
+          <div class="home-section-title"><h2 id="howTitle">三步开摊</h2><span>拖动相同食材升级</span></div>
+          <div><span><b>1</b>点摊位<small>消耗体力出食材</small></span><i>›</i><span><b>2</b>做合成<small>两份相同升一级</small></span><i>›</i><span><b>3</b>抢出餐<small>倒计时内交订单</small></span></div>
+        </section>
+
+        <div class="home-actions">
+          <button id="workshopBtn"><span>⚒</span><b>夜市工坊</b><small>金币购买永久升级</small></button>
+          <button id="recipeBtn"><span>📖</span><b>菜谱图鉴</b><small>查看四大菜系</small></button>
+          <button id="homeHelpBtn"><span>🏮</span><b>掌柜秘籍</b><small>规则与技巧</small></button>
+        </div>
+
+        <p id="homeTip" class="home-tip">订单倒计时只在营业期间推进，回到主页会暂停。</p>
+      </section>
+
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">食</span>
+          <div><strong>夜市合合乐</strong><small>第 <span id="levelValue">1</span> 级</small></div>
+        </div>
+        <div class="currencies" aria-label="游戏资源">
+          <span class="pill coin"><b>●</b><span id="coinValue">0</span></span>
+          <span class="pill energy"><b>♥</b><span id="energyValue">100</span></span>
+        </div>
+      </header>
+
+      <section class="orders-wrap" aria-label="食客订单">
+        <div class="orders-title">
+          <span>今日食单 <b id="shiftValue">第 1 轮 · 0/6</b></span>
+          <span id="comboValue" class="combo-value">百搭酱 0/7</span>
+          <span id="livesValue" class="lives-value" aria-label="食客耐心">♥♥♥</span>
+          <button id="soundBtn" class="icon-btn" aria-label="切换音效">♪</button>
+        </div>
+        <div id="orders" class="orders"></div>
+        <div class="run-status"><b id="runSummary"></b><small id="perkSummary"></small></div>
+      </section>
+
+      <section class="board-wrap">
+        <canvas id="gameCanvas" aria-label="合成棋盘，可点击灶台产出食材，拖动相同食材完成合成"></canvas>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+        <div id="guide" class="guide">
+          <div class="guide-card">
+            <span class="guide-hand">☝</span>
+            <strong>选一家摊位开火</strong>
+            <p>蒸笼、面点和烧烤会产出不同食材</p>
+            <button id="guideBtn">开张啦</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tool-tray" aria-label="食材操作">
+        <span id="selectionInfo">点选食材，可出售或拆分</span>
+        <div><button id="sellBtn">出售</button><button id="splitBtn">拆分 (2)</button><button id="skipBtn">换急单 (1)</button></div>
+      </section>
+      <footer class="bottombar">
+        <button id="homeBtn"><span>⌂</span>主页</button>
+        <button id="helpBtn"><span>?</span>玩法</button>
+        <button id="rescueBtn"><span>+12</span>救场</button>
+        <div class="progress-block">
+          <div class="progress-copy"><span>夜市声望</span><b id="xpCopy">0 / 60</b></div>
+          <div class="progress"><i id="xpBar"></i></div>
+        </div>
+        <button id="resetBtn"><span>↻</span>重开</button>
+      </footer>
+    </main>
+
+    <dialog id="helpDialog">
+      <button class="dialog-close" aria-label="关闭">×</button>
+      <h2>掌柜秘籍</h2>
+      <ol>
+        <li>点击蒸笼铺、面点铺或烧烤炉，产出各自菜系的食材。</li>
+        <li>同菜系、同等级的两个食材才能合成更高级美食。</li>
+        <li>订单有倒计时；超时会失去一颗耐心，并产生占格垃圾。</li>
+        <li>18 秒内连续交单可累积金币倍率，贵客订单时间更短、奖励更高。</li>
+        <li>每合成 7 次获得百搭酱，它能代替同等级任意菜系参与合成。</li>
+        <li>两轮通关：首轮结束三选一能力。通关得一星，零失误两星，零失误且三连单三星。</li>
+        <li>点选食材可出售或拆分，每局有 2 次拆分、1 次免费换急单。</li>
+        <li>营业时每 3 秒恢复 1 体力。垃圾花 15 金币清理；救场首用 30 金币，之后每次加 20。</li>
+        <li>金币、菜谱收藏与工坊升级在失败或重开后保留。换关会重新开始一局。</li>
+      </ol>
+      <button class="primary dialog-ok">知道了</button>
+    </dialog>
+
+    <dialog id="recipeDialog" class="recipe-dialog">
+      <button class="dialog-close recipe-close" aria-label="关闭">×</button>
+      <h2>夜市菜谱图鉴</h2>
+      <p id="collectionCount"></p>
+      <div id="collectionList" class="recipe-list"></div>
+      <button class="primary recipe-ok">收下菜谱</button>
+    </dialog>
+
+    <dialog id="endDialog" class="end-dialog">
+      <div class="end-icon">收</div>
+      <h2 id="endTitle">今晚打烊了</h2>
+      <p id="endText">食客的耐心耗尽，调整一下出餐顺序再来。</p>
+      <div class="end-stats"><span>总分 <b id="finalScore">0</b></span><span>坚持到第 <b id="finalShift">1</b> 轮</span></div>
+      <button id="restartBtn" class="primary">重新开张</button>
+      <button id="endHomeBtn" class="secondary">返回夜市 · 升级装备</button>
+    </dialog>
+
+    <dialog id="perkDialog">
+      <small class="eyebrow">首轮完成 · 营业暂停</small>
+      <h2>今晚，你想怎么经营？</h2>
+      <p>三选一，本局有效。选好后开始第二轮。</p>
+      <div id="perkChoices" class="choice-list"></div>
+    </dialog>
+
+    <dialog id="workshopDialog">
+      <button id="workshopClose" class="dialog-close" aria-label="关闭工坊">×</button>
+      <h2>夜市工坊</h2>
+      <p id="workshopCoins"></p>
+      <div id="upgradeList" class="choice-list"></div>
+    </dialog>
+
+    <script src="game.js"></script>
+  </body>
+</html>
