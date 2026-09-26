@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="game-shell">
+    <main id="gameShell" class="game-shell at-home">
       <section id="homeScreen" class="home-screen" aria-label="夜市合合乐主页">
         <div class="home-glow"></div>
         <header class="home-header">
@@ -20,15 +20,16 @@
             <p>烟火夜市经营录</p>
             <h1>夜市合合乐</h1>
           </div>
-          <button id="homeSoundBtn" class="home-sound" aria-label="切换音乐和音效"><span>♫</span><small>音乐开</small></button>
+          <button id="homeSoundBtn" class="home-sound" aria-label="打开声音设置"><span>♫</span><small>点我听</small></button>
         </header>
 
         <div class="home-stall">
           <div class="stall-awning"><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="chef-badge">👨‍🍳</div>
+          <div class="chef-badge" aria-hidden="true">🍜</div>
+          <div class="stall-sign">一间小铺 · 四季烟火</div>
           <div class="home-copy">
             <small id="homeGreeting">掌柜，今晚也要准时开张</small>
-            <strong>灯亮了，食客正在街口等你</strong>
+            <strong>把人间烟火<br>做成拿手好菜。</strong>
           </div>
           <div class="home-stats">
             <span><small>掌柜等级</small><b>Lv.<em id="homeLevel">1</em></b></span>
@@ -39,7 +40,7 @@
         </div>
 
         <section class="level-select" aria-labelledby="levelTitle">
-          <div class="home-section-title"><h2 id="levelTitle">两轮一局 · 挑战三星</h2><span>通关解锁下一关</span></div>
+          <div class="home-section-title"><h2 id="levelTitle">今夜，在哪条街开张？</h2><span>两轮一局 · 挑战三星</span></div>
           <div class="level-cards">
             <button class="level-card selected" data-stage="1"><i>1</i><span><b>长街初灯</b><small>舒缓 · 6 单目标</small></span><em>已选择</em></button>
             <button class="level-card" data-stage="2"><i>2</i><span><b>雨夜客潮</b><small>急单 · 初始杂物</small></span><em>未解锁</em></button>
@@ -48,7 +49,7 @@
         </section>
 
         <section class="how-to-home" aria-labelledby="howTitle">
-          <div class="home-section-title"><h2 id="howTitle">三步开摊</h2><span>拖动相同食材升级</span></div>
+          <div class="home-section-title"><h2 id="howTitle">三步开摊</h2><span>拖动或点两份相同食材</span></div>
           <div><span><b>1</b>点摊位<small>消耗体力出食材</small></span><i>›</i><span><b>2</b>做合成<small>两份相同升一级</small></span><i>›</i><span><b>3</b>抢出餐<small>倒计时内交订单</small></span></div>
         </section>
 
@@ -77,10 +78,13 @@
           <span>今日食单 <b id="shiftValue">第 1 轮 · 0/6</b></span>
           <span id="comboValue" class="combo-value">百搭酱 0/7</span>
           <span id="livesValue" class="lives-value" aria-label="食客耐心">♥♥♥</span>
-          <button id="soundBtn" class="icon-btn" aria-label="切换音效">♪</button>
+          <button id="soundBtn" class="icon-btn" aria-label="打开声音设置">♪</button>
         </div>
         <div id="orders" class="orders"></div>
         <div class="run-status"><b id="runSummary"></b><small id="perkSummary"></small></div>
+        <div class="shift-track" aria-label="本局出餐进度"><i id="shiftBar"></i></div>
+        <div class="heat-row"><span id="heatCopy">炉火 0/12</span><div class="heat-track"><i id="heatBar"></i></div><small id="spaceCopy">空位 49</small></div>
+        <div id="orderHint" class="order-hint" role="status">点击订单，查看备菜路线</div>
       </section>
 
       <section class="board-wrap">
@@ -98,7 +102,7 @@
 
       <section class="tool-tray" aria-label="食材操作">
         <span id="selectionInfo">点选食材，可出售或拆分</span>
-        <div><button id="sellBtn">出售</button><button id="splitBtn">拆分 (2)</button><button id="skipBtn">换急单 (1)</button></div>
+        <div><button id="sellBtn">出售</button><button id="splitBtn">拆分 (2)</button><button id="skipBtn">换急单 (1)</button><button id="hintBtn">找合成</button></div>
       </section>
       <footer class="bottombar">
         <button id="homeBtn"><span>⌂</span>主页</button>
@@ -118,6 +122,9 @@
       <ol>
         <li>点击蒸笼铺、面点铺或烧烤炉，产出各自菜系的食材。</li>
         <li>同菜系、同等级的两个食材才能合成更高级美食。</li>
+        <li>手机可以先点一份食材，再点另一份相同食材完成合成；选中后点空格可以移动。金色描边标记可以合成的食材。</li>
+        <li>点击未完成订单可追踪备菜路线，蓝色描边标记需要的摊位。订单中带 ✓ 的菜已经备齐。</li>
+        <li>每合成 12 次进入 15 秒旺火：摊位双倍备料速度、体力消耗为零。旺火期间继续合成可积累下一次炉火。</li>
         <li>订单有倒计时；超时会失去一颗耐心，并产生占格垃圾。</li>
         <li>18 秒内连续交单可累积金币倍率，贵客订单时间更短、奖励更高。</li>
         <li>每合成 7 次获得百搭酱，它能代替同等级任意菜系参与合成。</li>
@@ -142,7 +149,9 @@
       <h2 id="endTitle">今晚打烊了</h2>
       <p id="endText">食客的耐心耗尽，调整一下出餐顺序再来。</p>
       <div class="end-stats"><span>总分 <b id="finalScore">0</b></span><span>坚持到第 <b id="finalShift">1</b> 轮</span></div>
-      <button id="restartBtn" class="primary">重新开张</button>
+      <p id="resultAdvice"></p>
+      <button id="nextStageBtn" class="primary">挑战下一关</button>
+      <button id="restartBtn" class="secondary">重新开张</button>
       <button id="endHomeBtn" class="secondary">返回夜市 · 升级装备</button>
     </dialog>
 
@@ -160,6 +169,19 @@
       <div id="upgradeList" class="choice-list"></div>
     </dialog>
 
+    <dialog id="soundDialog" class="sound-dialog">
+      <button id="soundClose" class="dialog-close" aria-label="关闭声音设置">×</button>
+      <small class="eyebrow">NIGHT MARKET RADIO · 夜市电台</small>
+      <h2>让小铺热闹起来</h2>
+      <div class="radio-art" aria-hidden="true"><span>♫</span><i></i><i></i><i></i><i></i><i></i></div>
+      <p id="audioStatus" role="status">点击开启，听一曲夜市小调。</p>
+      <div class="sound-setting"><span><b>夜市小调</b><small>轻快旋律 · 柔和伴奏</small></span><button id="musicToggle" aria-pressed="true">开启</button></div>
+      <label class="volume-setting" for="musicVolume"><span>音乐音量 <output id="volumeValue">55%</output></span><input id="musicVolume" type="range" min="0" max="100" value="55" /></label>
+      <div class="sound-setting"><span><b>操作音效</b><small>合成、出餐与奖励提示</small></span><button id="effectsToggle" aria-pressed="true">开启</button></div>
+      <button id="audioPreview" class="primary">试听音乐与音效</button>
+      <p class="sound-note">切到后台自动静音，设置会保存在本机。</p>
+    </dialog>
+    <script src="audio.js"></script>
     <script src="game.js"></script>
   </body>
 </html>

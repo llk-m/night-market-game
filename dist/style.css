@@ -241,3 +241,191 @@ dialog > p { color: #bcd7cd; line-height: 1.6; font-size: 14px; }
   .order-items { min-height: 24px; font-size: 21px; }
   .bottombar { padding-top: 4px; }
 }
+
+/* Keep a usable board on phones; short screens scroll instead of shrinking every tile. */
+.game-shell { height: auto; min-height: 100svh; grid-template-rows: auto auto minmax(390px, 1fr) auto auto; }
+.board-wrap { min-height: 390px; }
+.order-card { padding-top: 12px; text-align: center; }
+.order-card.tracked { border-color: #7ee5e2; }
+.order-card.ready { border-color: #ffdb76; }
+.order-action { margin-top: 5px; font-size: 11px; color: #a4c7bc; }
+.order-card.tracked .order-action { color: #91eeeb; }
+.order-card.ready .order-action { color: #ffe39b; font-weight: 800; }
+.ingredient-ready small { color: #9cf4bb; }
+.shift-track, .heat-track { overflow: hidden; border-radius: 9px; background: #041c24; }
+.shift-track { height: 5px; margin: 7px 3px; }
+.shift-track i, .heat-track i { display: block; height: 100%; border-radius: inherit; transition: width .2s; }
+.shift-track i { background: linear-gradient(90deg, #35b5a1, #b6e091); }
+.heat-row { display: flex; align-items: center; gap: 9px; padding: 0 3px; }
+.heat-row > span { font-size: 12px; color: #ffc276; min-width: 80px; }
+.heat-track { flex: 1; height: 6px; }
+.heat-track i { background: linear-gradient(90deg, #ec764c, #ffe183); }
+.heat-row small { color: #a7c8bd; font-size: 11px; }
+.heat-row small.low-space { color: #ff9989; }
+.heat-row > span.fever { color: #ffde85; font-weight: 900; }
+.order-hint { margin-top: 7px; padding: 7px 9px; border: 1px solid #76dad52b; border-radius: 9px; background: #092a33; color: #bce8dc; font-size: 12px; line-height: 1.4; min-height: 32px; }
+.tool-tray > div { grid-template-columns: repeat(4, 1fr); }
+.tool-tray button { min-height: 42px; padding: 7px 2px; font-size: 12px; }
+.tool-tray > span { min-height: 30px; line-height: 1.4; }
+.bottombar > button { min-height: 48px; }
+.icon-btn { min-width: 38px; min-height: 34px; }
+.dialog-close { min-width: 44px; min-height: 44px; }
+#resultAdvice { font-size: 13px; text-align: left; padding: 12px; border-radius: 12px; background: #061f27; }
+[hidden] { display: none !important; }
+@media (max-width: 420px) {
+  .game-shell { grid-template-rows: auto auto minmax(370px, 1fr) auto auto; }
+  .board-wrap { min-height: 370px; }
+  .topbar { padding-left: 11px; padding-right: 11px; }
+  .orders-wrap { padding-left: 9px; padding-right: 9px; }
+  .run-status small { font-size: 11px; }
+  .home-screen { padding-left: 16px; padding-right: 16px; }
+  .home-section-title span { font-size: 10px; }
+  .home-copy strong { font-size: 15px; }
+}
+@media (max-width: 360px) {
+  .pill { min-width: 57px; padding-right: 7px; font-size: 13px; }
+  .brand strong { font-size: 15px; }
+  .order-items small { font-size: 10px; }
+  .home-header h1 { font-size: 24px; }
+  .home-header { gap: 8px; }
+  .home-sound { width: 48px; }
+  .home-lantern { width: 48px; }
+}
+@media (min-width: 700px) and (min-height: 760px) {
+  .game-shell { min-height: min(930px, calc(100svh - 28px)); }
+}
+
+/* Lantern light, painted jade and paper order tickets. */
+:root { --paper: #fff2d7; --gold: #eec77d; --muted: #a2beb1; }
+body { background-image: linear-gradient(#03181d5c, #021519b3), url("assets/night-market.png"); }
+button { -webkit-tap-highlight-color: transparent; transition: background .18s, border-color .18s, box-shadow .18s, transform .18s; }
+.game-shell { background: linear-gradient(160deg, #123b40f5, #08262bf5 60%, #071d24fa); box-shadow: 0 25px 90px #0009; }
+.game-shell.at-home { height: 100svh; min-height: 100svh; }
+.home-screen { background: linear-gradient(180deg, #072d3366 0%, #062a2fbb 36%, #061f26f5 65%), url("assets/night-market.png") center top / cover; padding-top: max(26px, env(safe-area-inset-top)); }
+.home-header { margin-bottom: 24px; }
+.home-header p { font-size: 10px; color: #f2cf91; letter-spacing: .25em; }
+.home-header h1 { font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif; font-size: 38px; letter-spacing: .04em; color: #fff1ce; }
+.home-lantern { border: 1px solid #f9d597; background: linear-gradient(145deg, #f7d187, #d77b45); box-shadow: 0 0 32px #f2ad3f35, inset 0 2px #ffecbda6; }
+.home-sound { width: 54px; height: 56px; border-radius: 50% 50% 17px 17px; background: #123e43e6; border-color: #d4b77855; }
+.home-sound.playing { box-shadow: 0 0 18px #f3ce6440; color: #ffe3a0; }
+.home-sound small { color: #e2d1a3; font-size: 10px; }
+.home-stall { padding: 67px 20px 20px; border-radius: 22px; border-color: #ecd19988; background: linear-gradient(135deg, #215b58f5, #113a3cf5); box-shadow: 0 16px 40px #00151980, inset 0 0 0 5px #f2ce8b0b; }
+.stall-awning { height: 35px; border-radius: 22px 22px 8px 8px; }
+.stall-awning i { background: #c75e45; border-bottom: 3px solid #863b2d; }
+.stall-awning i:nth-child(even) { background: #efcf8c; border-color: #b69050; }
+.stall-sign { position: absolute; top: 40px; left: 21px; color: #d9c694; font-size: 10px; letter-spacing: .15em; }
+.chef-badge { width: 82px; height: 82px; top: 69px; right: 20px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff9e8, #eed296); border: 5px double #c89d60; font-size: 46px; transform: rotate(9deg); box-shadow: 0 10px 20px #062c3799; }
+.home-copy { padding-right: 85px; }
+.home-copy small { font-size: 10px; color: #b0cebc; }
+.home-copy strong { margin-top: 8px; color: #fff0cc; font-size: 25px; line-height: 1.45; font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif; letter-spacing: .04em; }
+.home-stats { margin: 18px 0; gap: 0; border-block: 1px solid #b6c29b33; padding: 11px 0; }
+.home-stats span { padding: 0 5px; border: 0; border-radius: 0; background: none; }
+.home-stats span + span { border-left: 1px solid #b6c29b33; }
+.home-stats small { color: #adc8b4; font-size: 11px; }
+.home-stats b { font-size: 18px; color: #ffe0a2; }
+.start-game-btn { border-radius: 14px; background: linear-gradient(120deg, #ffe1a0, #eeb364); color: #5a301d; box-shadow: inset 0 2px #fff4d5, 0 4px 0 #a66738, 0 8px 18px #071e2755; }
+.start-game-btn span { font-size: 20px; }
+.home-section-title { margin: 22px 2px 10px; }
+.home-section-title h2 { font-size: 14px; color: #ead0a0; }
+.home-section-title span { font-size: 10px; color: #a0b6a9; }
+.level-cards { gap: 8px; }
+.level-card { min-height: 62px; border-radius: 13px; padding: 10px 12px; background: #12383ce6; border-color: #9cbca329; }
+.level-card > i { width: 34px; height: 37px; border-radius: 50% 50% 11px 11px; background: #e9bf79; color: #593f29; }
+.level-card.selected { background: linear-gradient(95deg, #346354, #173f3de6); border-color: #e8c788b3; box-shadow: inset 3px 0 #e6c580, 0 5px 15px #071d232b; }
+.level-card.locked { opacity: .68; filter: saturate(.5); }
+.level-card span small { font-size: 11px; color: #a6c5b6; }
+.level-card em { font-size: 11px; }
+.home-actions button { border-radius: 13px; background: #12363b; border-color: #759c8e40; }
+.home-actions button:first-child { background: linear-gradient(110deg, #3f4c3b, #153b3b); border-color: #d4b77c4d; }
+.home-actions b { color: #f4ddb0; }
+.how-to-home > div:last-child { background: #092c31; border-color: #b3c0a32e; }
+.home-tip { color: #9ab8aa; }
+.topbar { padding-bottom: 12px; }
+.brand-mark { background: linear-gradient(145deg, #f5d598, #dc9b5a); color: #553722; }
+.brand strong { color: #f7e4be; letter-spacing: .04em; }
+.pill { border-color: #d1bb7b40; background: #07272be0; }
+.orders-title { margin-bottom: 9px; color: #d8c299; }
+.orders-title b { color: #a1cabb; font-weight: 500; }
+.orders { gap: 9px; }
+.order-card { color: #4c3e2a; border: 2px solid #d7c398; background: linear-gradient(135deg, #fff6e1, #efdfbc); border-radius: 13px; box-shadow: 0 4px 0 #0a202655, inset 0 0 0 3px #fff9ed66; padding: 11px 7px 7px; }
+.order-card::before { content: ""; position: absolute; top: -4px; left: 50%; transform: translateX(-50%); width: 25px; height: 7px; background: #b99f70; border: 1px solid #f6e4bb; border-radius: 3px; }
+.order-items { padding-top: 2px; }
+.order-items small { color: #5c4e37; font-weight: 700; font-size: 11px; }
+.ingredient-ready small { color: #25724a; }
+.order-reward { color: #996322; margin-top: 8px; }
+.order-reward em { color: #756247; }
+.order-action { padding-top: 5px; border-top: 1px dashed #b69f7370; margin-top: 6px; color: #7d6b4d; font-size: 10px; letter-spacing: .04em; }
+.timer-track { height: 4px; background: #d5c5a3; margin-top: 6px; }
+.timer-track i { background: #3e977c; }
+.order-card.tracked { border-color: #76cab4; background: linear-gradient(135deg, #fff7df, #e3ecce); }
+.order-card.tracked .order-action { color: #2c755e; }
+.order-card.ready { border-color: #f3c05d; background: linear-gradient(135deg, #fff7dc, #f9d998); }
+.order-card.ready .order-action { color: #825018; }
+.order-card.vip { border-color: #b9a0c9; background: linear-gradient(135deg, #fff0e3, #e5d5e6); }
+.vip-tag { color: #7f578b; top: 5px; font-size: 8px; }
+.run-status { padding-top: 12px; }
+.run-status b { color: #eccc92; font-size: 12px; }
+.run-status small { color: #96bcad; font-size: 10px; }
+.order-hint { background: #1e4946; border-color: #6e9e8266; color: #c9dfbf; border-left: 3px solid #caa66a; }
+.tool-tray > span { color: #a4c1b0; font-size: 11px; }
+.tool-tray button { border-color: #a9bd984d; background: linear-gradient(#24514f, #183e40); border-radius: 11px; color: #e9d6a8; box-shadow: inset 0 1px #bdd5a414; }
+#hintBtn { background: linear-gradient(#78613c, #514b34); border-color: #c9a36288; color: #ffe4af; }
+.bottombar { background: linear-gradient(transparent, #071e24 35%); }
+.bottombar > button { color: #a4c2b5; font-size: 11px; }
+.bottombar > button span { border-radius: 50% 50% 10px 10px; background: #214745; color: #e5cb8e; }
+dialog { background: linear-gradient(145deg, #20514f, #0c3037); border-color: #d1af7277; }
+dialog h2 { color: #ffe2ad; font-size: 23px; padding-right: 18px; }
+.sound-dialog { max-width: 390px; }
+.sound-dialog .eyebrow { font-size: 10px; letter-spacing: .12em; }
+.radio-art { display: flex; justify-content: center; align-items: center; gap: 7px; height: 90px; margin: 17px 0; border-radius: 18px; border: 1px solid #c7b07844; background: repeating-linear-gradient(0deg, #ffffff03 0 2px, transparent 2px 5px), #09292f; }
+.radio-art span { font-size: 44px; color: #e7bf7a; margin-right: 18px; }
+.radio-art i { width: 5px; height: 25px; border-radius: 4px; background: #93c4a4; }
+.radio-art i:nth-child(3), .radio-art i:nth-child(5) { height: 44px; background: #dfc08b; }
+.radio-art i:nth-child(4) { height: 58px; }
+.sound-setting { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; gap: 12px; border-top: 1px solid #a6c2a62b; }
+.sound-setting b, .sound-setting small { display: block; }
+.sound-setting b { color: #f5dfba; font-size: 15px; }
+.sound-setting small { color: #adc2b1; font-size: 11px; margin-top: 4px; }
+.sound-setting button { border: 1px solid #b9d5a966; background: #43735b; color: #fff3d0; border-radius: 20px; min-width: 78px; min-height: 42px; cursor: pointer; font-size: 12px; }
+.sound-setting button[aria-pressed="false"] { background: #18373c; color: #a3b8ae; border-color: #83958b55; }
+.volume-setting { display: block; padding: 4px 0 18px; }
+.volume-setting > span { display: flex; justify-content: space-between; font-size: 12px; color: #b6cbbb; }
+.volume-setting output { color: #edca8c; }
+.volume-setting input { display: block; width: 100%; height: 32px; margin: 7px 0 0; accent-color: #eec884; cursor: pointer; }
+#audioStatus { font-size: 12px; min-height: 38px; }
+#audioPreview { display: block; margin: 12px auto; }
+.sound-dialog .sound-note { font-size: 10px; color: #92b09f; text-align: center; margin-bottom: 0; }
+@media (hover: hover) {
+  .level-card:not(.locked):hover, .home-actions button:hover { border-color: #e1c38b; transform: translateY(-2px); }
+  .tool-tray button:hover:not(:disabled) { background: #386459; }
+}
+@media (max-width: 420px) {
+  .home-header h1 { font-size: 31px; }
+  .home-copy strong { font-size: 22px; }
+  .home-screen { padding-top: max(22px, env(safe-area-inset-top)); }
+  .home-lantern { width: 53px; height: 59px; }
+  .home-header { gap: 10px; }
+  .home-stall { padding-inline: 16px; }
+  .order-card { padding-left: 4px; padding-right: 4px; }
+  .orders { gap: 6px; }
+  .topbar { padding-bottom: 8px; }
+  .orders-title { margin-bottom: 6px; }
+  .order-card { padding-top: 9px; padding-bottom: 5px; }
+  .order-action { padding-top: 3px; margin-top: 4px; }
+  .order-reward { margin-top: 4px; }
+  .run-status { padding-top: 8px; }
+  .order-hint { margin-top: 5px; padding-block: 6px; }
+  .tool-tray > span { min-height: 24px; }
+}
+@media (max-width: 360px) {
+  .home-header h1 { font-size: 26px; }
+  .home-header p { font-size: 8px; }
+  .home-copy strong { font-size: 19px; }
+  .chef-badge { width: 64px; height: 64px; font-size: 35px; right: 16px; }
+  .home-copy { padding-right: 65px; }
+  .home-section-title { flex-wrap: wrap; gap: 5px; }
+  .order-items small { font-size: 10px; }
+}
+@media (min-width: 700px) and (min-height: 760px) {
+  .game-shell.at-home { height: min(930px, calc(100svh - 28px)); min-height: min(930px, calc(100svh - 28px)); }
+}

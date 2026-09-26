@@ -6,15 +6,19 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../dist/game.js'), 'utf8');
+const audioSource = fs.readFileSync(path.join(__dirname, '../dist/audio.js'), 'utf8');
 
 function boot(saved) {
   const nodes = new Map();
   function element() {
     const classes = new Set();
     const children = new Map();
+    const listeners = new Map();
     return { style: {}, dataset: {}, open: false, textContent: '', innerHTML: '',
       classList: { add: x => classes.add(x), remove: x => classes.delete(x), contains: x => classes.has(x), toggle(x, v) { v ? classes.add(x) : classes.delete(x); } },
-      addEventListener() {}, setAttribute() {}, setPointerCapture() {},
+      addEventListener(name, fn) { listeners.set(name, fn); },
+      fire(name, event = {}) { listeners.get(name)?.({ preventDefault() {}, pointerId: 1, ...event }); },
+      setAttribute() {}, setPointerCapture() {},
       getBoundingClientRect: () => ({ width: 390, height: 450, left: 0, top: 0 }),
       getContext: () => ({ setTransform() {} }),
       querySelector(s) { if (!children.has(s)) children.set(s, element()); return children.get(s); },
@@ -33,11 +37,14 @@ function boot(saved) {
     performance: { now: () => 0 }, devicePixelRatio: 1, requestAnimationFrame() {},
     setTimeout() {}, clearTimeout() {}, setInterval() {}, clearInterval() {}, confirm: () => true, console,
   });
+  vm.runInContext(audioSource, context);
   vm.runInContext(source.replace(/\}\)\(\);\s*$/, `globalThis.api = {
     get state() { return state; }, activePlay, updateTimers, makeOrder, makeOrders,
     canComplete, canMergePieces, completeShift, choosePerk, beginRun, selectStage,
     finishRun, buyUpgrade, discover, fulfill, produce, ensureProducers,
-    select(i) { selectedCell = i; }, sellSelected, splitSelected, save
+    select(i) { selectedCell = i; }, sellSelected, splitSelected, save,
+    movePiece, orderInventory, findMerge, renderGuidance,
+    get selected() { return selectedCell; }
   }; })();`), context);
   const api = context.api;
   function play() { api.state.introduced = true; document.getElementById('homeScreen').classList.add('hidden'); }
@@ -122,4 +129,129 @@ test('complete order-to-victory loop consumes items and records exactly one clea
   assert.equal(api.state.stageWins[1],2);
   const coins = api.state.coins;
   api.fulfill(0); assert.equal(api.state.coins,coins);
+});
+
+test('twelve merges activate free production, faster cooldowns, and pause at home', () => {
+  const {api, play, document} = boot(); play();
+  api.state.board.fill(null);
+  api.state.board[2] = {type:'generator', chain:'rice', cooldown:0};
+  for (let n = 0; n < 12; n++) {
+    api.state.board[0] = {type:'item', chain:'rice', level:0};
+    api.state.board[1] = {type:'item', chain:'rice', level:0};
+    api.movePiece(0,1);
+  }
+  assert.equal(api.state.merges, 12);
+  assert.equal(api.state.feverTime, 15);
+  assert.equal(api.state.heat, 0);
+  api.state.energy = 0;
+  api.produce(2);
+  assert.equal(api.state.energy, 0);
+  assert.equal(api.state.board[2].cooldown, 2);
+  api.updateTimers(.5);
+  assert.equal(api.state.board[2].cooldown, 1);
+  document.getElementById('homeScreen').classList.remove('hidden');
+  api.updateTimers(3);
+  assert.equal(api.state.feverTime, 14.5);
+  api.state.feverTime = .25; play();
+  api.updateTimers(.5);
+  assert.equal(api.state.board[2].cooldown, .25);
+  assert.equal(api.state.feverTime, 0);
+});
+
+test('tap-to-merge, tap-to-move, cancelled gestures and secondary pointers are safe', () => {
+  const {api, play, nodes} = boot(); play();
+  api.state.board.fill(null);
+  ['rice','noodle','grill'].forEach((chain, i) => { api.state.board[10+i] = {type:'generator',chain}; });
+  api.state.board[0] = {type:'item',chain:'rice',level:0};
+  api.state.board[1] = {type:'item',chain:'rice',level:0};
+  const canvas = nodes.get('gameCanvas');
+  // 390 × 450 test canvas: 53.43px cells, 8px left and 11.29px top.
+  const first = {clientX:35, clientY:38};
+  const second = {clientX:88, clientY:38};
+  canvas.fire('pointerdown', first); canvas.fire('pointerup', first);
+  canvas.fire('pointerdown', second);
+  canvas.fire('pointerup', {...second, pointerId:2});
+  assert.equal(api.state.board[1].level,0);
+  canvas.fire('pointerup', second);
+  assert.equal(api.state.board[0],null);
+  assert.equal(api.state.board[1].level,1);
+  canvas.fire('pointerdown', first);
+  assert.equal(api.state.board[0].level,1);
+  assert.equal(api.state.board[1],null);
+  canvas.fire('pointerdown', first); canvas.fire('pointercancel');
+  canvas.fire('pointerup',second);
+  assert.equal(api.state.board[0].level,1);
+});
+
+test('sale undo conserves currency and item; later board changes invalidate undo', () => {
+  const {api, play} = boot(); play();
+  api.state.board[0] = {type:'item',chain:'grill',level:3};
+  api.select(0); const coins = api.state.coins;
+  api.sellSelected(); assert.equal(api.state.coins,coins+4);
+  api.sellSelected(); assert.equal(api.state.coins,coins);
+  assert.equal(api.state.board[0].level,3);
+  api.sellSelected();
+  api.state.board[1] = {type:'item',chain:'rice',level:0};
+  api.movePiece(1,0);
+  api.sellSelected();
+  assert.equal(api.state.board[0],null);
+  assert.equal(api.state.coins,coins+5);
+});
+
+test('order readiness allocates duplicates once and capped items have no merge hint', () => {
+  const {api, play} = boot(); play(); api.state.board.fill(null);
+  api.state.board[0] = {type:'item',chain:'rice',level:1};
+  const items = api.orderInventory({items:[{chain:'rice',level:1},{chain:'rice',level:1}]});
+  assert.equal(items[0].ready,true); assert.equal(items[1].ready,false);
+  api.state.board[1] = {type:'item',chain:'rice',level:5};
+  api.state.board[2] = {type:'item',chain:'rice',level:5};
+  assert.equal(api.canMergePieces(api.state.board[1], api.state.board[2]),false);
+  api.state.board[3] = {type:'wild',level:1};
+  api.findMerge(); assert.equal(api.selected,0);
+});
+
+test('old saves gain new run counters and persisted fever resets on a new run', () => {
+  const {api} = boot();
+  const old = JSON.parse(JSON.stringify(api.state));
+  delete old.totalServed; delete old.heat; delete old.feverTime; delete old.merges;
+  old.shift = 2; old.served = 2;
+  const reload = boot(old);
+  assert.equal(reload.api.state.totalServed,8);
+  assert.equal(reload.api.state.heat,0);
+  reload.api.state.feverTime=12;
+  reload.api.save();
+  const resumed = boot(JSON.parse(reload.storage.get('nightMarketMergeSave_v3')));
+  assert.equal(resumed.api.state.feverTime,12);
+  resumed.api.beginRun(1);
+  assert.equal(resumed.api.state.feverTime,0);
+  assert.equal(resumed.api.state.totalServed,0);
+});
+
+test('next-stage result action starts the unlocked stage and last stage hides it', () => {
+  const {api, play, nodes} = boot(); play();
+  api.finishRun(true);
+  assert.equal(nodes.get('nextStageBtn').hidden,false);
+  const coins = api.state.coins;
+  nodes.get('nextStageBtn').fire('click');
+  assert.equal(api.state.stage,2);
+  assert.equal(api.state.coins,coins);
+  assert.equal(api.state.gameOver,false);
+  assert.equal(api.activePlay(),true);
+  api.beginRun(3); api.finishRun(true);
+  assert.equal(nodes.get('nextStageBtn').hidden,true);
+});
+
+test('independent audio preferences survive saves and new runs; old mute is respected', () => {
+  const {api,storage}=boot();
+  api.state.musicOn=false; api.state.effectsOn=true; api.state.musicVolume=.23;
+  api.beginRun(1); api.save();
+  const reload=boot(JSON.parse(storage.get('nightMarketMergeSave_v3')));
+  assert.equal(reload.api.state.musicOn,false);
+  assert.equal(reload.api.state.effectsOn,true);
+  assert.equal(reload.api.state.musicVolume,.23);
+  const old=JSON.parse(JSON.stringify(api.state));
+  delete old.effectsOn; delete old.musicVolume;
+  const migrated=boot(old);
+  assert.equal(migrated.api.state.effectsOn,false);
+  assert.equal(migrated.api.state.musicVolume,.55);
 });

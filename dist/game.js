@@ -61,12 +61,15 @@
   let drag = null;
   let particles = [];
   let toastTimer;
-  let audioOn = true;
-  let musicTimer = null;
+  const audio = new window.NightMarketAudio();
   let lastTime = performance.now();
   let uiClock = 0;
   let saveClock = 0;
   let selectedCell = -1;
+  let trackedOrder = null;
+  let hintedCells = [];
+  let hintTime = 0;
+  let undoSale = null;
   const perkDefs = {
     speed: { name: "快火主厨", text: "本局所有摊位备料时间减少 35%" },
     calm: { name: "茶水待客", text: "下一轮每位食客多等 25 秒" },
@@ -93,6 +96,12 @@
     state.rescues ||= 0;
     state.splits ??= 2;
     state.discards ??= 1;
+    state.heat ??= 0;
+    state.feverTime ??= 0;
+    state.merges ??= 0;
+    state.totalServed ??= (state.shift - 1) * shiftTarget() + state.served;
+    state.effectsOn ??= state.musicOn !== false;
+    state.musicVolume = Number.isFinite(state.musicVolume) ? Math.max(0, Math.min(1, state.musicVolume)) : .55;
     state.board.forEach(p => {
       if (p?.type === "item") {
         p.level = Math.min(p.level, 5);
@@ -129,7 +138,7 @@
   function beginRun(stageNumber) {
     const previous = state;
     state = freshState();
-    for (const key of ["coins", "level", "xp", "bestCombo", "unlockedStage", "stageWins", "musicOn", "records", "upgrades", "discovered"])
+    for (const key of ["coins", "level", "xp", "bestCombo", "unlockedStage", "stageWins", "musicOn", "effectsOn", "musicVolume", "records", "upgrades", "discovered"])
       state[key] = previous[key];
     state.stage = stageNumber;
     state.introduced = true;
@@ -139,6 +148,9 @@
     state.orders = makeOrders(state.level, 1, stageNumber);
     for (let n = 0; n < currentStage().trash; n++) addTrash();
     selectedCell = -1;
+    trackedOrder = null;
+    hintedCells = [];
+    undoSale = null;
     drag = null;
     $("guide").classList.add("hidden");
     afterChange();
@@ -252,15 +264,19 @@
     const bw = geom.cell * COLS;
     const bh = geom.cell * ROWS;
     const grd = ctx.createLinearGradient(0, geom.y, 0, geom.y + bh);
-    grd.addColorStop(0, "rgba(16,66,69,.94)");
-    grd.addColorStop(1, "rgba(7,38,45,.97)");
+    grd.addColorStop(0, "#286461");
+    grd.addColorStop(1, "#103f43");
     roundedRect(geom.x - 5, geom.y - 5, bw + 10, bh + 10, 22);
     ctx.fillStyle = grd;
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,208,112,.5)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#be975d";
+    ctx.lineWidth = 3;
     ctx.stroke();
+    roundedRect(geom.x - 1, geom.y - 1, bw + 2, bh + 2, 18);
+    ctx.strokeStyle = "#efd8a633"; ctx.lineWidth = 1; ctx.stroke();
 
+    const tracked = state.orders.find(order => order.id === trackedOrder);
+    const neededChains = tracked ? orderInventory(tracked).filter(item => !item.ready).map(item => item.chain) : [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const i = index(c, r);
@@ -269,13 +285,20 @@
         const gap = 3;
         roundedRect(x + gap, y + gap, geom.cell - gap * 2, geom.cell - gap * 2, Math.max(7, geom.cell * .14));
         const even = (r + c) % 2 === 0;
-        ctx.fillStyle = even ? "rgba(117,178,148,.19)" : "rgba(82,143,130,.16)";
+        ctx.fillStyle = even ? "rgba(180,219,190,.12)" : "rgba(4,31,35,.21)";
         ctx.fill();
         ctx.strokeStyle = "rgba(209,235,193,.12)";
         ctx.lineWidth = 1;
         ctx.stroke();
         if (i === selectedCell) {
           ctx.strokeStyle = "#fff29d"; ctx.lineWidth = 3; ctx.stroke();
+        }
+        const piece = state.board[i];
+        const selected = state.board[selectedCell];
+        if ((i !== selectedCell && canMergePieces(selected, piece)) || (hintTime > 0 && hintedCells.includes(i))) {
+          ctx.strokeStyle = "#ffce64"; ctx.lineWidth = 2.5; ctx.stroke();
+        } else if (piece?.type === "generator" && neededChains.includes(piece.chain)) {
+          ctx.strokeStyle = "#7ee5e2"; ctx.lineWidth = 2.5; ctx.stroke();
         }
         if (state.board[i] && (!drag || drag.from !== i)) drawPiece(state.board[i], x + geom.cell / 2, y + geom.cell / 2, geom.cell, 1);
       }
@@ -358,6 +381,12 @@
       ctx.font = `800 ${Math.max(9, size * .12)}px "Microsoft YaHei", sans-serif`;
       ctx.shadowColor = "#001"; ctx.shadowBlur = 3;
       ctx.fillText(def.name, 0, size * .31);
+      ctx.shadowColor = "transparent";
+      ctx.fillStyle = "#092d35";
+      ctx.beginPath(); ctx.arc(-s * .33, -s * .33, size * .1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffe4a2";
+      ctx.font = `800 ${Math.max(8, size * .13)}px system-ui`;
+      ctx.fillText(piece.level + 1, -s * .33, -s * .33 + .5);
     }
     ctx.restore();
   }
@@ -388,20 +417,23 @@
     particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 70 * dt; p.life -= 1.7 * dt; });
     particles = particles.filter(p => p.life > 0);
     updateTimers(dt);
-    drawBoard();
+    if (!document.hidden && $("homeScreen").classList.contains("hidden")) drawBoard();
     requestAnimationFrame(animate);
   }
 
   function updateTimers(dt) {
     if (!activePlay()) return;
     state.elapsed += dt;
+    const feverDt = Math.min(dt, state.feverTime);
+    state.feverTime = Math.max(0, state.feverTime - dt);
+    hintTime = Math.max(0, hintTime - dt);
     state.energyClock += dt;
     if (state.energyClock >= 3) {
       state.energy = Math.min(120, state.energy + Math.floor(state.energyClock / 3));
       state.energyClock %= 3;
     }
     state.board.forEach(piece => {
-      if (piece?.type === "generator" && piece.cooldown > 0) piece.cooldown = Math.max(0, piece.cooldown - dt);
+      if (piece?.type === "generator" && piece.cooldown > 0) piece.cooldown = Math.max(0, piece.cooldown - dt - feverDt);
     });
     if (state.comboTime > 0) {
       state.comboTime = Math.max(0, state.comboTime - dt);
@@ -423,6 +455,7 @@
       saveClock = 0;
       save();
     }
+    activateFever();
   }
 
   function expireOrder(orderIndex) {
@@ -459,30 +492,36 @@
 
   canvas.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    if (!activePlay()) return;
+    if (!activePlay() || drag) return;
     const p = point(e);
     const i = hitCell(p.x, p.y);
-    if (i < 0 || !state.board[i]) return;
+    if (i < 0) return;
+    const previousSelection = selectedCell;
+    if (!state.board[i]) {
+      if (state.board[selectedCell] && ["item", "wild"].includes(state.board[selectedCell].type)) movePiece(selectedCell, i);
+      return;
+    }
     selectedCell = i;
     renderTools();
     canvas.setPointerCapture(e.pointerId);
-    drag = { from: i, piece: state.board[i], x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false };
+    drag = { from: i, piece: state.board[i], x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false, previousSelection, pointerId: e.pointerId };
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
+    if (!drag || drag.pointerId !== e.pointerId) return;
     const p = point(e);
     drag.x = p.x; drag.y = p.y;
     if (Math.hypot(p.x - drag.sx, p.y - drag.sy) > 8) drag.moved = true;
   });
 
   canvas.addEventListener("pointerup", (e) => {
-    if (!drag) return;
+    if (!drag || drag.pointerId !== e.pointerId) return;
     const p = point(e);
     const target = hitCell(p.x, p.y);
     const source = drag.from;
     const piece = drag.piece;
     const moved = drag.moved;
+    const previousSelection = drag.previousSelection;
     drag = null;
     if (!activePlay()) return;
     if (!moved && piece.type === "trash") {
@@ -498,7 +537,17 @@
       produce(source);
       return;
     }
-    if (target < 0 || target === source) return;
+    if (!moved) {
+      if (previousSelection !== source && canMergePieces(state.board[previousSelection], piece)) movePiece(previousSelection, source);
+      return;
+    }
+    movePiece(source, target);
+  });
+
+  function movePiece(source, target) {
+    if (!activePlay() || target < 0 || target >= state.board.length || target === source) return;
+    const piece = state.board[source];
+    if (!piece) return;
     const there = state.board[target];
     if (!there) {
       state.board[target] = piece; state.board[source] = null;
@@ -511,6 +560,8 @@
       selectedCell = target;
       state.xp += 5 + base.level * 2;
       state.mergeMeter = (state.mergeMeter || 0) + 1;
+      state.merges++;
+      state.heat = Math.min(12, state.heat + 1);
       burstAt(target);
       softTick(620);
       if (state.mergeMeter >= 7) {
@@ -521,16 +572,19 @@
       }
       checkLevel();
       discover(state.board[target]);
+      activateFever();
     } else {
       state.board[source] = there; state.board[target] = piece;
       softTick(240);
     }
+    selectedCell = target;
     afterChange();
-  });
+  }
 
   canvas.addEventListener("pointercancel", () => { drag = null; });
 
   function canMergePieces(a, b) {
+    if (!a || !b || a.level >= 5 || b.level >= 5) return false;
     if (a.type === "item" && b.type === "item") return a.chain === b.chain && a.level === b.level;
     if (a.type === "wild" && b.type === "item") return a.level === b.level;
     if (a.type === "item" && b.type === "wild") return a.level === b.level;
@@ -547,8 +601,9 @@
 
   function produce(generatorIndex) {
     const generator = state.board[generatorIndex];
+    if (!activePlay() || generator?.type !== "generator") return;
     if ((generator.cooldown || 0) > 0) { showToast(`摊位备料中，还要 ${generator.cooldown.toFixed(1)} 秒`); softTick(110); return; }
-    if (state.energy <= 0) { showToast("体力不够啦，完成订单或稍后再来"); softTick(100); return; }
+    if (state.energy <= 0 && state.feverTime <= 0) { showToast("体力不够，3 秒恢复 1 点；交单也能补充"); softTick(100); return; }
     const empties = state.board.map((v, i) => v ? -1 : i).filter(i => i >= 0);
     if (!empties.length) { showToast("棋盘满了，先合成或完成订单吧"); return; }
     const { c: gc, r: gr } = cellOf(generatorIndex);
@@ -559,7 +614,7 @@
     const target = empties[0];
     const level = Math.random() < Math.min(.6, .08 + (hasPerk("quality") ? .25 : 0)) ? 1 : 0;
     state.board[target] = { type: "item", chain: generator.chain, level };
-    state.energy--;
+    if (state.feverTime <= 0) state.energy--;
     generator.cooldown = 2 * (1 - state.upgrades.stove * .1) * (hasPerk("speed") ? .65 : 1);
     discover(state.board[target]);
     burstAt(target, "#ff9f57");
@@ -568,6 +623,10 @@
   }
 
   function canComplete(order) {
+    return orderInventory(order).every(item => item.ready);
+  }
+
+  function orderInventory(order) {
     const counts = {};
     state.board.forEach(p => {
       if (p?.type === "item") {
@@ -575,14 +634,67 @@
         counts[key] = (counts[key] || 0) + 1;
       }
     });
-    return order.items.every(item => counts[`${item.chain}:${item.level}`]-- > 0);
+    return order.items.map(item => ({ ...item, ready: counts[`${item.chain}:${item.level}`]-- > 0 }));
+  }
+
+  function activateFever() {
+    if (state.heat < 12 || state.feverTime > 0) return;
+    state.heat = 0;
+    state.feverTime = 15;
+    state.board.forEach(p => { if (p?.type === "generator") p.cooldown = 0; });
+    showToast("旺火 15 秒！免费出食材 · 双倍备料速度");
+    softTick(880);
+  }
+
+  function findMerge() {
+    if (!activePlay()) return;
+    for (let i = 0; i < state.board.length; i++) {
+      for (let j = i + 1; j < state.board.length; j++) {
+        if (!canMergePieces(state.board[i], state.board[j])) continue;
+        selectedCell = i;
+        hintedCells = [i, j];
+        hintTime = 4;
+        renderTools();
+        showToast("已选中第一份，点另一个金色格子合成");
+        return;
+      }
+    }
+    showToast("还没有可合成的一对，点击蓝色摊位继续备菜");
+  }
+
+  function renderGuidance() {
+    if (!state.orders.some(order => order.id === trackedOrder)) {
+      trackedOrder = state.orders.reduce((best, order) => !best || order.remaining < best.remaining ? order : best, null)?.id;
+    }
+    const order = state.orders.find(order => order.id === trackedOrder);
+    if (!order) return;
+    const missing = orderInventory(order).filter(item => !item.ready);
+    if (!missing.length) {
+      $("orderHint").textContent = "✓ 追踪订单已备齐，点击对应订单立即出餐！";
+    } else {
+      const item = missing[0];
+      const available = state.board.filter(p => p?.type === "item" && p.chain === item.chain && p.level < item.level)
+        .reduce((sum, p) => sum + 2 ** p.level, 0);
+      const deficit = Math.max(0, 2 ** item.level - available);
+      $("orderHint").textContent = `${generatorDefs[item.chain].emoji} ${generatorDefs[item.chain].name} → ${chains[item.chain][item.level].name} · ${deficit ? `约缺 ${deficit} 份基础食材` : "材料够了，合成即可"}`;
+    }
+    const free = state.board.filter(p => !p).length;
+    $("spaceCopy").textContent = `空位 ${free}`;
+    $("spaceCopy").classList.toggle("low-space", free < 7);
+    $("shiftBar").style.width = `${Math.min(100, state.totalServed / (shiftTarget() * 2) * 100)}%`;
+    $("heatCopy").textContent = state.feverTime > 0 ? `🔥 旺火 ${Math.ceil(state.feverTime)}s` : `炉火 ${state.heat}/12`;
+    $("heatBar").style.width = `${(state.feverTime > 0 ? state.feverTime / 15 : state.heat / 12) * 100}%`;
+    $("heatCopy").classList.toggle("fever", state.feverTime > 0);
   }
 
   function fulfill(orderIndex) {
     if (!activePlay()) return;
     const order = state.orders[orderIndex];
+    if (!order) return;
     if (!canComplete(order)) {
-      showToast(order.items.map(p => `${generatorDefs[p.chain].name} → ${chains[p.chain][p.level].name} L${p.level + 1}`).join("；"));
+      trackedOrder = order.id;
+      renderUI();
+      showToast("已追踪订单，按蓝色摊位的备菜路线制作");
       return;
     }
     order.items.forEach(item => {
@@ -601,6 +713,7 @@
     state.xp += 18 + order.items.length * 8;
     state.energy = Math.min(120, state.energy + 6 + state.upgrades.supply * 2);
     state.served++;
+    state.totalServed++;
     state.orders[orderIndex] = makeOrder(state.level, state.shift, orderIndex);
     showToast(`${order.vip ? "贵客满意！" : "上菜成功"} +${earned} · ${state.combo} 连击`);
     softTick(760);
@@ -657,7 +770,8 @@
     }
   }
 
-  function afterChange() {
+  function afterChange(keepSale = false) {
+    if (!keepSale) undoSale = null;
     ensureProducers();
     renderUI();
     save();
@@ -665,6 +779,7 @@
 
   function renderUI() {
     const atHome = !$("homeScreen").classList.contains("hidden");
+    $("gameShell").classList.toggle("at-home", atHome);
     document.querySelectorAll(".game-shell > header, .game-shell > .orders-wrap, .game-shell > .board-wrap, .game-shell > .tool-tray, .game-shell > footer").forEach(el => { el.inert = atHome; });
     $("coinValue").textContent = state.coins;
     $("energyValue").textContent = state.energy;
@@ -691,6 +806,7 @@
     });
     syncSoundUI();
     renderTools();
+    renderGuidance();
     $("xpCopy").textContent = `${state.xp} / ${xpNeeded()}`;
     $("xpBar").style.width = `${Math.min(100, state.xp / xpNeeded() * 100)}%`;
     const orders = $("orders");
@@ -699,18 +815,20 @@
       const ready = canComplete(order);
       const btn = document.createElement("button");
       const urgent = order.remaining / order.maxTime < .28;
-      btn.className = `order-card${ready ? " ready" : ""}${order.vip ? " vip" : ""}${urgent ? " urgent" : ""}`;
+      btn.className = `order-card${ready ? " ready" : ""}${order.vip ? " vip" : ""}${urgent ? " urgent" : ""}${order.id === trackedOrder ? " tracked" : ""}`;
       const names = order.items.map(item => chains[item.chain][item.level].name);
       btn.setAttribute("aria-label", `${order.vip ? "贵客，" : ""}${names.join("、")}，剩余${Math.ceil(order.remaining)}秒，奖励${order.reward}金币${ready ? "，可以交付" : ""}`);
-      btn.innerHTML = `${order.vip ? '<span class="vip-tag">贵客</span>' : ''}<span class="order-check">✓</span><div class="order-items">${order.items.map(item => { const def = chains[item.chain][item.level]; return `<span title="${def.name}">${def.emoji}<small>${def.name}</small></span>`; }).join("")}</div><div class="order-reward"><span>●</span>${order.reward}<em>${Math.ceil(order.remaining)}s</em></div><div class="timer-track"><i style="width:${Math.max(0, order.remaining / order.maxTime * 100)}%"></i></div>`;
+      btn.innerHTML = `${order.vip ? '<span class="vip-tag">贵客</span>' : ''}<span class="order-check">✓</span><div class="order-items">${orderInventory(order).map(item => { const def = chains[item.chain][item.level]; return `<span class="${item.ready ? "ingredient-ready" : ""}" title="${def.name}">${def.emoji}<small>${item.ready ? "✓ " : ""}${def.name}</small></span>`; }).join("")}</div><div class="order-reward"><span>●</span>${order.reward}<em>${Math.ceil(order.remaining)}s</em></div><div class="timer-track"><i style="width:${Math.max(0, order.remaining / order.maxTime * 100)}%"></i></div><div class="order-action">${ready ? "点击出餐" : order.id === trackedOrder ? "正在备菜" : "点击追踪"}</div>`;
       btn.addEventListener("click", () => fulfill(i));
       orders.appendChild(btn);
     });
   }
 
   function renderTimers() {
+    renderGuidance();
     $("energyValue").textContent = state.energy;
     $("comboValue").textContent = state.combo > 1 ? `${state.combo} 连击 · ${Math.ceil(state.comboTime)}s` : `百搭酱 ${state.mergeMeter}/7`;
+    $("comboValue").classList.toggle("hot", state.combo > 1);
     document.querySelectorAll(".order-card").forEach((card, i) => {
       const order = state.orders[i];
       card.querySelector("em").textContent = `${Math.max(0, Math.ceil(order.remaining))}s`;
@@ -758,28 +876,51 @@
     $("endText").textContent = state.won ? `${"★".repeat(state.resultStars || 1)} · 通关得一星；零失误再一星；零失误且三连单得三星。` : "金币、升级与收藏已保留。调整经营路线，再试一次。";
     $("finalScore").textContent = state.score;
     $("finalShift").textContent = state.shift;
+    const minutes = Math.floor(state.elapsed / 60);
+    const seconds = Math.floor(state.elapsed % 60).toString().padStart(2, "0");
+    $("resultAdvice").textContent = `用时 ${minutes}:${seconds} · 出餐 ${state.totalServed} 单 · 合成 ${state.merges} 次 · 最佳 ${state.runCombo} 连单。` +
+      (state.mistakes > 0 ? "下次先追踪急单，及时使用换单与救场。" : state.runCombo < 3 ? "想拿三星？提前备好三份订单，再连续交付。" : "节奏掌握得不错，试试更热闹的夜市！");
+    $("nextStageBtn").hidden = !state.won || state.stage >= 3;
+    $("restartBtn").textContent = state.won ? "再战本关 · 冲刺纪录" : "重新开张";
     if (!$("endDialog").open) $("endDialog").showModal();
   }
 
   function renderTools() {
     const piece = state.board[selectedCell];
-    $("selectionInfo").textContent = piece?.type === "item" ? `${chains[piece.chain][piece.level].name} · L${piece.level + 1}` : "点选食材，可出售或拆分";
-    $("sellBtn").disabled = piece?.type !== "item" || !activePlay();
+    $("selectionInfo").textContent = piece?.type === "item" ? `${chains[piece.chain][piece.level].name} · L${piece.level + 1} · 点金色同类合成 / 点空格移动` : piece?.type === "wild" ? `百搭酱 L${piece.level + 1} · 点同等级食材合成` : "点订单看路线 · 点两份相同食材合成";
+    $("sellBtn").disabled = (!undoSale && piece?.type !== "item") || !activePlay();
+    $("sellBtn").textContent = undoSale ? "撤销出售" : piece?.type === "item" ? `出售 +${piece.level + 1}` : "出售";
     $("splitBtn").disabled = piece?.type !== "item" || piece.level === 0 || state.splits <= 0 || !activePlay();
     $("splitBtn").textContent = `拆分 (${state.splits})`;
     $("skipBtn").textContent = `换急单 (${state.discards})`;
     $("skipBtn").disabled = state.discards <= 0 || !activePlay();
     $("rescueBtn").title = `全场 +12 秒 · ${30 + state.rescues * 20} 金币`;
+    $("rescueBtn").querySelector("span").textContent = `${30 + state.rescues * 20}币`;
+    $("hintBtn").disabled = !activePlay();
     $("runSummary").textContent = `第 ${state.shift}/2 轮 · ${state.served}/${shiftTarget()} 单 · ${state.score} 分`;
     $("perkSummary").textContent = state.perks.length ? state.perks.map(key => perkDefs[key].name).join(" · ") : "通过首轮，选择一项经营能力";
   }
 
   function sellSelected() {
+    if (!activePlay()) return;
+    if (undoSale) {
+      const { index: slot, piece, coins } = undoSale;
+      if (!state.board[slot] && state.coins >= coins) {
+        state.board[slot] = piece;
+        state.coins -= coins;
+        selectedCell = slot;
+        afterChange();
+        showToast("已撤销出售");
+      }
+      return;
+    }
     const piece = state.board[selectedCell];
     if (!activePlay() || piece?.type !== "item") return;
     state.coins += piece.level + 1;
+    undoSale = { index: selectedCell, piece: { ...piece }, coins: piece.level + 1 };
     state.board[selectedCell] = null;
-    afterChange();
+    afterChange(true);
+    showToast("已出售，下一次棋盘操作前可以撤销");
   }
 
   function splitSelected() {
@@ -826,61 +967,37 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 1500);
   }
 
-  function getAudioContext() {
-    const A = window.AudioContext || window.webkitAudioContext;
-    return getAudioContext.ac || (getAudioContext.ac = new A());
-  }
-
-  function playTone(freq, duration = .1, volume = .035, type = "sine") {
-    try {
-      const ac = getAudioContext();
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.frequency.value = freq;
-      osc.type = type;
-      gain.gain.setValueAtTime(volume, ac.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.001, ac.currentTime + duration);
-      osc.connect(gain).connect(ac.destination);
-      osc.start(); osc.stop(ac.currentTime + duration);
-    } catch (_) {}
-  }
-
   function softTick(freq) {
-    if (!audioOn) return;
-    playTone(freq);
+    audio.effect(freq);
   }
 
-  function startMusic() {
-    if (!audioOn || musicTimer) return;
-    const notes = [220, 277, 330, 415, 330, 277, 247, 330];
-    let note = 0;
-    const play = () => {
-      if (!audioOn || document.hidden) return;
-      playTone(notes[note++ % notes.length], .55, .012, "triangle");
-    };
-    play();
-    musicTimer = setInterval(play, 920);
-  }
-
-  function stopMusic() {
-    clearInterval(musicTimer);
-    musicTimer = null;
+  async function startMusic() {
+    audio.configure({ music: state.musicOn !== false, effects: state.effectsOn, volume: state.musicVolume });
+    const unlocked = await audio.start();
+    if (document.hidden) audio.stop();
+    syncSoundUI();
+    $("audioStatus").textContent = !unlocked ? "声音尚未启动，请点试听重试，并检查设备音量。" :
+      audio.playing && state.musicVolume > 0 ? "正在播放：夜市小调 · 原创循环配乐" : state.musicVolume === 0 && state.musicOn ? "音乐音量为 0，向右拖动滑块即可听到。" : "背景音乐已关闭，操作音效可独立开启。";
   }
 
   function syncSoundUI() {
-    $("soundBtn").textContent = audioOn ? "♪" : "×";
-    $("homeSoundBtn").classList.toggle("off", !audioOn);
-    $("homeSoundBtn").querySelector("span").textContent = audioOn ? "♫" : "×";
-    $("homeSoundBtn").querySelector("small").textContent = audioOn ? "音乐开" : "音乐关";
+    const audible = audio.playing && state.musicVolume > 0;
+    $("soundBtn").textContent = audible ? "♫" : "♪";
+    $("homeSoundBtn").classList.toggle("off", !state.musicOn);
+    $("homeSoundBtn").classList.toggle("playing", audible);
+    $("homeSoundBtn").querySelector("span").textContent = audible ? "♫" : "♪";
+    $("homeSoundBtn").querySelector("small").textContent = !state.musicOn ? "音乐关" : state.musicVolume === 0 ? "音量 0" : audible ? "播放中" : "点我听";
+    $("musicToggle").textContent = state.musicOn ? "已开启" : "已关闭";
+    $("musicToggle").setAttribute("aria-pressed", String(state.musicOn !== false));
+    $("effectsToggle").textContent = state.effectsOn ? "已开启" : "已关闭";
+    $("effectsToggle").setAttribute("aria-pressed", String(state.effectsOn));
+    $("musicVolume").value = Math.round(state.musicVolume * 100);
+    $("volumeValue").textContent = `${Math.round(state.musicVolume * 100)}%`;
   }
 
-  function toggleAudio() {
-    audioOn = !audioOn;
-    state.musicOn = audioOn;
-    if (audioOn) startMusic(); else stopMusic();
-    syncSoundUI();
-    $("homeTip").textContent = audioOn ? "音乐与操作音效已开启。" : "音乐与操作音效已关闭。";
-    save();
+  function openSound() {
+    $("soundDialog").showModal();
+    startMusic();
   }
 
   $("guideBtn").addEventListener("click", () => {
@@ -908,8 +1025,13 @@
     renderUI();
     save();
   });
-  $("soundBtn").addEventListener("click", toggleAudio);
-  $("homeSoundBtn").addEventListener("click", toggleAudio);
+  $("soundBtn").addEventListener("click", openSound);
+  $("homeSoundBtn").addEventListener("click", openSound);
+  $("soundClose").addEventListener("click", () => $("soundDialog").close());
+  $("musicToggle").addEventListener("click", () => { state.musicOn = !state.musicOn; startMusic(); save(); });
+  $("effectsToggle").addEventListener("click", () => { state.effectsOn = !state.effectsOn; startMusic().then(() => softTick(620)); save(); });
+  $("musicVolume").addEventListener("input", e => { state.musicVolume = Number(e.target.value) / 100; startMusic(); save(); });
+  $("audioPreview").addEventListener("click", () => { startMusic().then(() => softTick(760)); });
   document.querySelectorAll(".level-card").forEach(card => card.addEventListener("click", () => selectStage(Number(card.dataset.stage))));
   $("rescueBtn").addEventListener("click", () => {
     if (!activePlay()) return;
@@ -944,6 +1066,7 @@
   $("workshopBtn").addEventListener("click", () => { renderWorkshop(); $("workshopDialog").showModal(); });
   $("workshopClose").addEventListener("click", () => $("workshopDialog").close());
   $("sellBtn").addEventListener("click", sellSelected);
+  $("hintBtn").addEventListener("click", findMerge);
   $("splitBtn").addEventListener("click", splitSelected);
   $("skipBtn").addEventListener("click", () => {
     if (!activePlay() || state.discards <= 0) return;
@@ -959,17 +1082,31 @@
     $("homeScreen").inert = false;
     renderUI();
   });
+  $("nextStageBtn").addEventListener("click", () => {
+    if (!state.won || state.stage >= 3) return;
+    const nextStage = state.stage + 1;
+    $("endDialog").close();
+    beginRun(nextStage);
+    $("homeScreen").classList.add("hidden");
+    $("homeScreen").inert = true;
+    renderUI();
+    startMusic();
+  });
   $("perkDialog").addEventListener("cancel", e => e.preventDefault());
   $("endDialog").addEventListener("cancel", e => { e.preventDefault(); $("endHomeBtn").click(); });
-  document.addEventListener("visibilitychange", () => { drag = null; lastTime = performance.now(); save(); });
-  window.addEventListener("pagehide", save);
+  document.addEventListener("visibilitychange", () => {
+    drag = null; lastTime = performance.now(); save();
+    if (document.hidden) audio.stop();
+    else if (audio.context) startMusic();
+    syncSoundUI();
+  });
+  window.addEventListener("pagehide", () => { audio.stop(); save(); });
 
   window.addEventListener("resize", resize);
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(resize).observe(canvas.parentElement);
   state = load();
   normalizeProgress();
   ensureProducers();
-  audioOn = state.musicOn !== false;
   if (state.introduced) $("guide").classList.add("hidden");
   resize();
   renderUI();
