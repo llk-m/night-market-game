@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b2630" />
-    <meta name="description" content="在烟火夜市里合成食材、完成订单的原创 Canvas 小游戏。" />
+    <meta name="description" content="不用赶时间的夜市小店养成：合成美食、招待街坊、扩建装修，慢慢经营自己的小店。" />
     <title>夜市合合乐</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d3b45'/%3E%3Cpath d='M17 26h30l-4 24H21z' fill='%23f3a43b'/%3E%3Cpath d='M21 26c0-10 22-10 22 0' fill='none' stroke='%23fff2cc' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M26 16c-5-7 7-8 2-14M38 16c-5-7 7-8 2-14' fill='none' stroke='%23ff7058' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="preload" href="assets/night-market.png" as="image" />
@@ -23,34 +23,34 @@
           <button id="homeSoundBtn" class="home-sound" aria-label="打开声音设置"><span>♫</span><small>点我听</small></button>
         </header>
 
-        <div class="home-stall">
+        <div class="home-stall" id="shopScene" data-rank="1">
           <div class="stall-awning"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="chef-badge" aria-hidden="true">🍜</div>
-          <div class="stall-sign">一间小铺 · 四季烟火</div>
+          <div id="shopName" class="stall-sign">街角小摊</div>
           <div class="home-copy">
             <small id="homeGreeting">掌柜，今晚也要准时开张</small>
-            <strong>把人间烟火<br>做成拿手好菜。</strong>
+            <strong>一间小店，<br>慢慢长成喜欢的样子。</strong>
           </div>
+          <div class="shop-windows" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div id="shopDecor" class="shop-decor empty" aria-label="小店已摆放的装饰"></div>
           <div class="home-stats">
-            <span><small>掌柜等级</small><b>Lv.<em id="homeLevel">1</em></b></span>
+            <span><small>店铺等级</small><b>Lv.<em id="homeLevel">1</em></b></span>
             <span><small>持有金币</small><b>● <em id="homeCoins">80</em></b></span>
-            <span><small>最高连击</small><b><em id="homeCombo">0</em> 连</b></span>
+            <span><small>招待食客</small><b><em id="homeServed">0</em> 位</b></span>
           </div>
           <button id="startGameBtn" class="start-game-btn"><span>继续营业</span><small id="homeProgress">第 1 轮 · 0/6 单</small></button>
         </div>
 
-        <section class="level-select" aria-labelledby="levelTitle">
-          <div class="home-section-title"><h2 id="levelTitle">今夜，在哪条街开张？</h2><span>两轮一局 · 挑战三星</span></div>
-          <div class="level-cards">
-            <button class="level-card selected" data-stage="1"><i>1</i><span><b>长街初灯</b><small>舒缓 · 6 单目标</small></span><em>已选择</em></button>
-            <button class="level-card" data-stage="2"><i>2</i><span><b>雨夜客潮</b><small>急单 · 初始杂物</small></span><em>未解锁</em></button>
-            <button class="level-card" data-stage="3"><i>3</i><span><b>灯会之夜</b><small>极限 · 仅 2 耐心</small></span><em>未解锁</em></button>
-          </div>
+        <section class="growth-preview" aria-label="小店成长目标">
+          <div class="home-section-title"><h2 id="growthGoal">下一步：灯下食铺</h2><span>成长永久保留</span></div>
+          <p id="growthCopy"></p>
+          <div class="growth-track"><i id="growthBar"></i></div>
+          <button id="openGrowthBtn">查看成长与装修 →</button>
         </section>
 
         <section class="how-to-home" aria-labelledby="howTitle">
           <div class="home-section-title"><h2 id="howTitle">三步开摊</h2><span>拖动或点两份相同食材</span></div>
-          <div><span><b>1</b>点摊位<small>消耗体力出食材</small></span><i>›</i><span><b>2</b>做合成<small>两份相同升一级</small></span><i>›</i><span><b>3</b>抢出餐<small>倒计时内交订单</small></span></div>
+          <div><span><b>1</b>点摊位<small>免费出食材</small></span><i>›</i><span><b>2</b>做合成<small>两份相同升一级</small></span><i>›</i><span><b>3</b>交食单<small>赚金币养小店</small></span></div>
         </section>
 
         <div class="home-actions">
@@ -59,31 +59,29 @@
           <button id="homeHelpBtn"><span>🏮</span><b>掌柜秘籍</b><small>规则与技巧</small></button>
         </div>
 
-        <p id="homeTip" class="home-tip">订单倒计时只在营业期间推进，回到主页会暂停。</p>
+        <p id="homeTip" class="home-tip">没有倒计时，不用赶进度。随时回来，小店一直都在。</p>
       </section>
 
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark">食</span>
-          <div><strong>夜市合合乐</strong><small>第 <span id="levelValue">1</span> 级</small></div>
+          <div><strong>夜市合合乐</strong><small>我的小店 Lv.<span id="levelValue">1</span></small></div>
         </div>
         <div class="currencies" aria-label="游戏资源">
           <span class="pill coin"><b>●</b><span id="coinValue">0</span></span>
-          <span class="pill energy"><b>♥</b><span id="energyValue">100</span></span>
+
         </div>
       </header>
 
       <section class="orders-wrap" aria-label="食客订单">
         <div class="orders-title">
-          <span>今日食单 <b id="shiftValue">第 1 轮 · 0/6</b></span>
-          <span id="comboValue" class="combo-value">百搭酱 0/7</span>
-          <span id="livesValue" class="lives-value" aria-label="食客耐心">♥♥♥</span>
+          <span>街坊食单 <b id="shiftValue">不催单 · 慢慢做</b></span>
+          <small id="spaceCopy">空位 49</small>
           <button id="soundBtn" class="icon-btn" aria-label="打开声音设置">♪</button>
         </div>
         <div id="orders" class="orders"></div>
         <div class="run-status"><b id="runSummary"></b><small id="perkSummary"></small></div>
-        <div class="shift-track" aria-label="本局出餐进度"><i id="shiftBar"></i></div>
-        <div class="heat-row"><span id="heatCopy">炉火 0/12</span><div class="heat-track"><i id="heatBar"></i></div><small id="spaceCopy">空位 49</small></div>
+        <div class="shift-track" aria-label="店铺扩建食客进度"><i id="shiftBar"></i></div>
         <div id="orderHint" class="order-hint" role="status">点击订单，查看备菜路线</div>
       </section>
 
@@ -93,26 +91,25 @@
         <div id="guide" class="guide">
           <div class="guide-card">
             <span class="guide-hand">☝</span>
-            <strong>选一家摊位开火</strong>
-            <p>蒸笼、面点和烧烤会产出不同食材</p>
+            <strong>慢慢做一顿好饭</strong>
+            <p>① 点摊位出食材<br>② 点两份相同食材合成<br>③ 点做好的订单，赚金币扩建小店<br><small>食材免费，订单不限时。</small></p>
             <button id="guideBtn">开张啦</button>
           </div>
         </div>
       </section>
 
       <section class="tool-tray" aria-label="食材操作">
-        <span id="selectionInfo">点选食材，可出售或拆分</span>
-        <div><button id="sellBtn">出售</button><button id="splitBtn">拆分 (2)</button><button id="skipBtn">换急单 (1)</button><button id="hintBtn">找合成</button></div>
+        <span id="selectionInfo">点两份相同食材合成</span>
+        <div><button id="sellBtn">出售</button><button id="skipBtn">免费换单</button><button id="hintBtn">找合成</button></div>
       </section>
       <footer class="bottombar">
         <button id="homeBtn"><span>⌂</span>主页</button>
         <button id="helpBtn"><span>?</span>玩法</button>
-        <button id="rescueBtn"><span>+12</span>救场</button>
+        <button id="growthGameBtn"><span>⌂</span>养小店</button>
         <div class="progress-block">
-          <div class="progress-copy"><span>夜市声望</span><b id="xpCopy">0 / 60</b></div>
+          <div class="progress-copy"><span>小店成长</span><b id="xpCopy">0 / 60</b></div>
           <div class="progress"><i id="xpBar"></i></div>
         </div>
-        <button id="resetBtn"><span>↻</span>重开</button>
       </footer>
     </main>
 
@@ -120,19 +117,12 @@
       <button class="dialog-close" aria-label="关闭">×</button>
       <h2>掌柜秘籍</h2>
       <ol>
-        <li>点击蒸笼铺、面点铺或烧烤炉，产出各自菜系的食材。</li>
-        <li>同菜系、同等级的两个食材才能合成更高级美食。</li>
-        <li>手机可以先点一份食材，再点另一份相同食材完成合成；选中后点空格可以移动。金色描边标记可以合成的食材。</li>
-        <li>点击未完成订单可追踪备菜路线，蓝色描边标记需要的摊位。订单中带 ✓ 的菜已经备齐。</li>
-        <li>每合成 12 次进入 15 秒旺火：摊位双倍备料速度、体力消耗为零。旺火期间继续合成可积累下一次炉火。</li>
-        <li>订单有倒计时；超时会失去一颗耐心，并产生占格垃圾。</li>
-        <li>18 秒内连续交单可累积金币倍率，贵客订单时间更短、奖励更高。</li>
-        <li>每合成 7 次获得百搭酱，它能代替同等级任意菜系参与合成。</li>
-        <li>两轮通关：首轮结束三选一能力。通关得一星，零失误两星，零失误且三连单三星。</li>
-        <li>点选食材可出售或拆分，每局有 2 次拆分、1 次免费换急单。</li>
-        <li>营业时每 3 秒恢复 1 体力。垃圾花 15 金币清理；救场首用 30 金币，之后每次加 20。</li>
-        <li>金币、菜谱收藏与工坊升级在失败或重开后保留。换关会重新开始一局。</li>
+        <li><b>点摊位</b>免费出食材，再点两份相同食材，合成更高级的菜。</li>
+        <li><b>点订单交菜</b>，获得金币。没有倒计时，也不会营业失败；不会做就点订单看路线，或免费换单。</li>
+        <li><b>用金币养小店</b>，达到食客数量后扩建，解锁新菜和茶饮；也可以挑喜欢的装饰。</li>
       </ol>
+      <p>每招待 10 位食客，送 120 金币心意；每位常客每来 5 次，送 80 金币谢礼。都是自动领取，不用额外操作。</p>
+
       <button class="primary dialog-ok">知道了</button>
     </dialog>
 
@@ -144,22 +134,24 @@
       <button class="primary recipe-ok">收下菜谱</button>
     </dialog>
 
-    <dialog id="endDialog" class="end-dialog">
-      <div class="end-icon">收</div>
-      <h2 id="endTitle">今晚打烊了</h2>
-      <p id="endText">食客的耐心耗尽，调整一下出餐顺序再来。</p>
-      <div class="end-stats"><span>总分 <b id="finalScore">0</b></span><span>坚持到第 <b id="finalShift">1</b> 轮</span></div>
-      <p id="resultAdvice"></p>
-      <button id="nextStageBtn" class="primary">挑战下一关</button>
-      <button id="restartBtn" class="secondary">重新开张</button>
-      <button id="endHomeBtn" class="secondary">返回夜市 · 升级装备</button>
-    </dialog>
-
-    <dialog id="perkDialog">
-      <small class="eyebrow">首轮完成 · 营业暂停</small>
-      <h2>今晚，你想怎么经营？</h2>
-      <p>三选一，本局有效。选好后开始第二轮。</p>
-      <div id="perkChoices" class="choice-list"></div>
+    <dialog id="growthDialog" class="growth-dialog">
+      <button id="growthClose" class="dialog-close" aria-label="关闭小店成长">×</button>
+      <small class="eyebrow">一步一步，把小店养大</small>
+      <h2>我的小店</h2>
+      <p id="growthWallet"></p>
+      <section class="expansion-card">
+        <h3 id="expansionName"></h3>
+        <p id="expansionDesc"></p>
+        <small id="expansionRequirements"></small>
+        <button id="expandBtn" class="primary">扩建小店</button>
+      </section>
+      <p id="growthNotice" role="status" aria-live="polite"></p>
+      <details><summary>查看 10 个成长阶段</summary><ol id="growthRoad" class="growth-road"></ol></details>
+      <h3>挑一件喜欢的装饰</h3>
+      <p class="growth-note">买下就会摆在首页，没有额外规则，喜欢就好。</p>
+      <div id="decorationList" class="decoration-list"></div>
+      <h3>常来坐坐的街坊</h3>
+      <div id="regularList"></div>
     </dialog>
 
     <dialog id="workshopDialog">

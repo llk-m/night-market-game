@@ -429,3 +429,71 @@ dialog h2 { color: #ffe2ad; font-size: 23px; padding-right: 18px; }
 @media (min-width: 700px) and (min-height: 760px) {
   .game-shell.at-home { height: min(930px, calc(100svh - 28px)); min-height: min(930px, calc(100svh - 28px)); }
 }
+
+/* A persistent shop, with visible additions as it grows. */
+.home-copy strong { font-size: 23px; }
+.home-copy { padding-right: 78px; }
+.stall-sign { font-size: 13px; font-weight: 800; color: #ffe1a2; letter-spacing: .08em; }
+.shop-decor { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; padding: 12px 8px 5px; min-height: 49px; border-bottom: 2px solid #c29c624d; }
+.shop-decor span { font-size: 29px; filter: drop-shadow(0 3px 3px #0005); }
+.shop-decor.empty::after { content: "给小店添一盏灯、一盆花、一点生活。"; align-self: center; font-size: 10px; color: #9fc0ae; }
+.home-stats { margin-top: 12px; }
+.shop-windows { display: none; justify-content: center; gap: 18px; margin-top: 18px; }
+.has-windows .shop-windows { display: flex; }
+.shop-windows i { width: 45px; height: 40px; border: 4px solid #9e7a4f; border-radius: 15px 15px 2px 2px; background: linear-gradient(90deg, transparent 46%, #9e7a4f 46% 54%, transparent 54%), linear-gradient(0deg, transparent 45%, #9e7a4f 45% 55%, transparent 55%), #ffdb86; box-shadow: 0 0 17px #ffba3540; }
+.has-courtyard { background: linear-gradient(145deg, #426345ef, #214b40f5); }
+.has-courtyard .shop-decor { background: repeating-linear-gradient(90deg, #5e7b5829 0 24px, transparent 24px 26px); border-radius: 9px; padding-bottom: 12px; }
+#shopScene[data-rank="2"] .stall-awning i, #shopScene[data-rank="3"] .stall-awning i { background: #d47f4b; }
+#shopScene[data-rank="7"] .stall-awning i, #shopScene[data-rank="8"] .stall-awning i, #shopScene[data-rank="9"] .stall-awning i, #shopScene[data-rank="10"] .stall-awning i { background: #9c4e3e; border-color: #dfb46b; }
+#shopScene .stall-awning i:nth-child(even) { background: #efcf8c; }
+.growth-preview { margin-top: 17px; border: 1px solid #bba47655; border-radius: 16px; padding: 15px; background: linear-gradient(135deg, #284d44, #12343a); }
+.growth-preview .home-section-title { margin: 0 0 9px; }
+.growth-preview p { color: #bad1bb; margin: 0 0 10px; font-size: 11px; line-height: 1.6; }
+.growth-track { height: 7px; border-radius: 8px; overflow: hidden; background: #072930; }
+.growth-track i { display: block; height: 100%; background: linear-gradient(90deg, #80b791, #eac982); border-radius: inherit; transition: width .3s; }
+#openGrowthBtn { border: 0; background: none; color: #f4d293; padding: 12px 0 0; font-size: 12px; cursor: pointer; width: 100%; text-align: right; min-height: 37px; }
+#openGrowthBtn.can-expand { color: #ffe7b2; font-weight: 900; }
+.customer-name { color: #7c694d; font-size: 10px; text-align: left; margin-bottom: 7px; }
+.orders-title #spaceCopy { color: #92b3a6; font-size: 11px; font-weight: 400; }
+.orders-title #spaceCopy.low-space { color: #ffc093; }
+.order-reward { justify-content: center; }
+.tool-tray > div { grid-template-columns: repeat(3,1fr); }
+.tool-tray button { font-size: 12px; }
+.bottombar > button { width: 52px; }
+.growth-dialog { width: min(92vw, 440px); }
+.growth-dialog h3 { color: #f7ddb0; font-size: 16px; margin: 23px 0 8px; }
+.growth-dialog .growth-note { font-size: 12px; }
+.expansion-card { border-radius: 15px; padding: 15px; border: 1px solid #d2b17466; background: #0b2d32; }
+.expansion-card h3 { margin: 0 0 8px; }
+.expansion-card p { color: #c0d0b7; font-size: 12px; line-height: 1.6; margin: 0 0 8px; }
+.expansion-card small { display: block; color: #f1ce8f; font-size: 11px; }
+.expansion-card button { display: block; width: 100%; margin-top: 17px; padding-inline: 10px; font-size: 13px; }
+#growthNotice { font-size: 12px; color: #ffdc91; }
+.growth-dialog summary { padding: 12px 0; cursor: pointer; font-size: 13px; color: #a9c9b6; }
+.growth-road { padding: 0; list-style: none; display: grid; gap: 7px; }
+.growth-road li { border-left: 2px solid #507168; padding: 5px 10px; font-size: 12px; color: #8eaca0; }
+.growth-road li.reached { border-color: #ecc783; color: #ffe0a8; }
+.growth-road small { display: block; font-size: 10px; color: #9fc0b0; }
+.decoration-list { display: grid; grid-template-columns: repeat(2,1fr); gap: 9px; }
+.decoration-list button { display: grid; gap: 5px; place-items: center; border: 1px solid #a0b08f55; border-radius: 14px; background: #123c3c; color: #f4d5a2; padding: 12px 5px; cursor: pointer; }
+.decoration-list button span { font-size: 30px; }
+.decoration-list button b { font-size: 12px; }
+.decoration-list button small { font-size: 11px; color: #aac1ae; }
+.decoration-list button:disabled { opacity: .65; }
+.regular-card { display: flex; gap: 13px; padding: 13px 0; border-top: 1px solid #b5c6a129; }
+.regular-card > span { font-size: 31px; }
+.regular-card b { font-size: 13px; color: #f0d6a3; }
+.regular-card small { display: block; font-size: 10px; color: #a6c3b4; margin-top: 4px; }
+.regular-card p { font-size: 11px; color: #bcd2c1; line-height: 1.6; margin: 5px 0; }
+.regular-card em { color: #e8a891; font-style: normal; letter-spacing: 3px; }
+@media (max-width:420px) {
+  .home-copy strong { font-size: 19px; }
+  .home-copy small { font-size: 9px; }
+  .chef-badge { top: 72px; width: 67px; height: 67px; font-size: 38px; }
+  .growth-preview .home-section-title { flex-wrap: wrap; gap: 5px; }
+}
+@media (max-width:360px) {
+  .home-copy strong { font-size: 17px; }
+  .home-copy { padding-right: 60px; }
+  .chef-badge { right: 12px; width: 59px; height: 59px; font-size: 33px; }
+}

@@ -5,13 +5,36 @@
   const ctx = canvas.getContext("2d");
   const COLS = 7;
   const ROWS = 8;
-  const SAVE_KEY = "nightMarketMergeSave_v3";
-  const OLD_SAVE_KEYS = ["nightMarketMergeSave_v2", "nightMarketMergeSave_v1"];
-  const stageDefs = {
-    1: { name: "长街初灯", desc: "节奏舒缓，熟悉摊位与连击", target: 6, timeRate: 1.12, vipBonus: 0, lives: 3, trash: 0, rewardRate: 1 },
-    2: { name: "雨夜客潮", desc: "订单更快，开局已有杂物", target: 7, timeRate: .82, vipBonus: .1, lives: 3, trash: 2, rewardRate: 1.18 },
-    3: { name: "灯会之夜", desc: "极限客流，两颗耐心守住全场", target: 8, timeRate: .66, vipBonus: .2, lives: 2, trash: 4, rewardRate: 1.42 },
+  const SAVE_KEY = "nightMarketMergeSave_cozy_v1";
+  const OLD_SAVE_KEYS = ["nightMarketMergeSave_v3", "nightMarketMergeSave_v2", "nightMarketMergeSave_v1"];
+  const shopDefs = [
+    {name:"街角小摊", orders:0, cost:0, unlock:"米食、面点、烧烤，从一张小食单开始"},
+    {name:"灯下食铺", orders:8, cost:280, unlock:"换上暖色棚顶，解锁三级菜品订单与新常客"},
+    {name:"巷口茶食", orders:22, cost:700, unlock:"解锁茶饮铺和甜品菜系"},
+    {name:"邻里小馆", orders:45, cost:1400, unlock:"添上窗台，解锁四级菜品订单"},
+    {name:"花间食堂", orders:80, cost:2400, unlock:"解锁花架和新的常客"},
+    {name:"庭院餐馆", orders:130, cost:3800, unlock:"扩建庭院，解锁五级招牌菜订单"},
+    {name:"长街名店", orders:200, cost:5800, unlock:"解锁庭院灯串和夜市招牌"},
+    {name:"烟火老字号", orders:300, cost:9000, unlock:"解锁最高级宴席订单与纪念装饰"},
+    {name:"四季食府", orders:430, cost:14000, unlock:"四季灯火，让小店成为街坊的回忆"},
+    {name:"夜市地标", orders:600, cost:21000, unlock:"最高店铺等级，仍可持续经营、收集菜谱和培养常客"},
+  ];
+  const decorDefs = {
+    lantern: {name:"小红灯笼", icon:"🏮", level:1, cost:120},
+    plant: {name:"窗边绿植", icon:"🪴", level:2, cost:220},
+    cat: {name:"招财小猫", icon:"🐈", level:3, cost:380},
+    flowers: {name:"四季花架", icon:"🌸", level:5, cost:650},
+    tea: {name:"庭院茶桌", icon:"🍵", level:6, cost:950},
+    lights: {name:"长街灯串", icon:"✨", level:7, cost:1400},
+    trophy: {name:"老字号牌匾", icon:"🏆", level:8, cost:2000},
+    moon: {name:"月下庭灯", icon:"🌙", level:9, cost:2800},
   };
+  const regularDefs = [
+    {name:"林奶奶", icon:"👵", chain:"rice", level:1, line:"热乎乎的饭菜，慢慢做就好。"},
+    {name:"阿远", icon:"🧑", chain:"noodle", level:2, line:"下班后来碗面，今天也辛苦了。"},
+    {name:"小桃", icon:"👩", chain:"sweet", level:3, line:"想喝你家的茶，也想看小店长大。"},
+    {name:"老周", icon:"👨", chain:"grill", level:5, line:"闻着炭火香就过来了！"},
+  ];
 
   const chains = {
     rice: [
@@ -63,59 +86,62 @@
   let toastTimer;
   const audio = new window.NightMarketAudio();
   let lastTime = performance.now();
-  let uiClock = 0;
   let saveClock = 0;
   let selectedCell = -1;
   let trackedOrder = null;
   let hintedCells = [];
   let hintTime = 0;
   let undoSale = null;
-  const perkDefs = {
-    speed: { name: "快火主厨", text: "本局所有摊位备料时间减少 35%" },
-    calm: { name: "茶水待客", text: "下一轮每位食客多等 25 秒" },
-    combo: { name: "连单达人", text: "本局连击窗口从 18 秒延长到 35 秒" },
-    quality: { name: "精选食材", text: "本局直接产出二级食材的概率增加 25%" },
-    tips: { name: "招牌营销", text: "本局订单金币额外增加 30%" },
-  };
   const upgradeDefs = {
     stove: { name: "高效炉灶", text: "每级缩短 10% 备料时间", cost: 180 },
-    service: { name: "舒适座席", text: "每级让食客多等 8 秒", cost: 160 },
-    supply: { name: "补给推车", text: "每级交单额外恢复 2 体力", cost: 140 },
+    service: { name: "舒适座席", text: "每级让订单收入增加 5%", cost: 160 },
+    supply: { name: "精选原料", text: "每级增加 5% 直接产出二级食材的概率", cost: 140 },
   };
 
   function normalizeProgress() {
-    state.upgrades ||= { stove: 0, service: 0, supply: 0 };
-    state.records ||= {};
+    state.upgrades ||= {stove:0, service:0, supply:0};
+    for (const key of Object.keys(upgradeDefs)) state.upgrades[key] = Math.max(0, Math.min(3, Number(state.upgrades[key]) || 0));
     state.discovered ||= {};
-    state.perks ||= [];
-    state.offers ||= [];
-    state.mistakes ||= 0;
-    state.runCombo ||= 0;
     state.elapsed ||= 0;
-    state.energyClock ||= 0;
-    state.rescues ||= 0;
-    state.splits ??= 2;
-    state.discards ??= 1;
-    state.heat ??= 0;
-    state.feverTime ??= 0;
-    state.merges ??= 0;
-    state.totalServed ??= (state.shift - 1) * shiftTarget() + state.served;
+    state.merges ||= 0;
     state.effectsOn ??= state.musicOn !== false;
+    state.musicOn ??= true;
     state.musicVolume = Number.isFinite(state.musicVolume) ? Math.max(0, Math.min(1, state.musicVolume)) : .55;
+    state.shopLevel = Math.max(1, Math.min(shopDefs.length, Math.floor(state.shopLevel || 1)));
+    state.decorations ||= {};
+    state.regulars ||= {};
+    if (state.mode !== "cozy") {
+      const legacyCompleted = Object.entries(state.stageWins || {}).reduce((sum, [stage, rounds]) => sum + rounds * ({1:6,2:7,3:8}[stage] || 6), 0) + (state.served || 0);
+      state.totalOrders = Math.max(0, state.totalServed || 0, legacyCompleted);
+      state.mode = "cozy";
+      state.teaUnlocked = state.level >= 3 || state.board.some(p => p?.type === "generator" && p.chain === "sweet");
+      state.board = state.board.map(p => p?.type === "trash" ? null : p);
+      state.gameOver = false;
+      state.offers = [];
+      state.perks = [];
+    }
+    state.totalOrders ||= 0;
+    state.teaUnlocked ||= state.shopLevel >= 3;
     state.board.forEach(p => {
       if (p?.type === "item") {
-        p.level = Math.min(p.level, 5);
+        p.level = Math.max(0, Math.min(p.level, 5));
         state.discovered[`${p.chain}:${p.level}`] = true;
       }
     });
   }
 
   function activePlay() {
-    return state.introduced && !state.gameOver && !state.offers.length && !document.hidden &&
+    return state.introduced && !document.hidden &&
       $("homeScreen").classList.contains("hidden") && !document.querySelector("dialog[open]");
   }
 
-  function hasPerk(key) { return state?.perks?.includes(key); }
+  function currentShop() { return shopDefs[state.shopLevel - 1]; }
+  function nextShop() { return shopDefs[state.shopLevel]; }
+  function expansionReady() {
+    const next = nextShop();
+    return Boolean(next && state.totalOrders >= next.orders && state.coins >= next.cost);
+  }
+
 
   function discover(piece) {
     if (piece?.type !== "item") return;
@@ -128,32 +154,43 @@
   }
 
   function ensureProducers() {
-    for (const chain of ["rice", "noodle", "grill", ...(state.level >= 3 ? ["sweet"] : [])]) {
+    for (const chain of ["rice", "noodle", "grill", ...(state.teaUnlocked ? ["sweet"] : [])]) {
       if (state.board.some(p => p?.type === "generator" && p.chain === chain)) continue;
       const open = state.board.findIndex(p => !p);
       if (open >= 0) state.board[open] = { type: "generator", chain, cooldown: 0 };
     }
   }
 
-  function beginRun(stageNumber) {
-    const previous = state;
-    state = freshState();
-    for (const key of ["coins", "level", "xp", "bestCombo", "unlockedStage", "stageWins", "musicOn", "effectsOn", "musicVolume", "records", "upgrades", "discovered"])
-      state[key] = previous[key];
-    state.stage = stageNumber;
-    state.introduced = true;
-    normalizeProgress();
-    ensureProducers();
-    state.lives = currentStage().lives;
-    state.orders = makeOrders(state.level, 1, stageNumber);
-    for (let n = 0; n < currentStage().trash; n++) addTrash();
-    selectedCell = -1;
-    trackedOrder = null;
-    hintedCells = [];
-    undoSale = null;
-    drag = null;
-    $("guide").classList.add("hidden");
+  function expandShop() {
+    if (!expansionReady()) return;
+    const next = nextShop();
+    state.coins -= next.cost;
+    state.shopLevel++;
+    state.teaUnlocked ||= state.shopLevel >= 3;
     afterChange();
+    $("growthNotice").textContent = `扩建完成！${next.name} · ${next.unlock}`;
+    softTick(880);
+  }
+
+  function buyDecoration(key) {
+    const def = decorDefs[key];
+    if (!def || state.decorations[key] || state.shopLevel < def.level || state.coins < def.cost) return;
+    state.coins -= def.cost;
+    state.decorations[key] = true;
+    afterChange();
+    $("growthNotice").textContent = `已摆放「${def.name}」，回到首页看看你的小店。`;
+    softTick(620);
+  }
+
+  function swapOrder() {
+    if (!activePlay()) return;
+    let i = state.orders.findIndex(order => order.id === trackedOrder);
+    if (i < 0) i = 0;
+    if (canComplete(state.orders[i])) { showToast("这份已经做好了，先交单领金币吧"); return; }
+    state.orders[i] = makeOrder(0, 0, i);
+    trackedOrder = state.orders[i].id;
+    afterChange();
+    showToast("已免费更换选中的订单，不扣金币和成长进度");
   }
 
   function freshState() {
@@ -166,47 +203,26 @@
     board[index(4, 7)] = { type: "item", chain: "noodle", level: 0 };
     board[index(5, 7)] = { type: "item", chain: "grill", level: 0 };
     return {
-      board, coins: 80, energy: 100, level: 1, xp: 0,
-      orders: makeOrders(1, 1, 1), introduced: false,
-      lives: 3, combo: 0, comboTime: 0, bestCombo: 0,
-      served: 0, shift: 1, score: 0, mergeMeter: 0, gameOver: false,
-      stage: 1, unlockedStage: 1, stageWins: { 1: 0, 2: 0, 3: 0 }, musicOn: true,
+      board, coins:80, level:1, xp:0, introduced:false,
+      orders:[], musicOn:true, shopLevel:1, totalOrders:0,
+      mode:"cozy", decorations:{}, regulars:{}, teaUnlocked:false,
     };
   }
 
   function load() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (saved && Array.isArray(saved.board) && saved.board.length === COLS * ROWS) {
-        saved.stage ||= 1;
-        saved.unlockedStage ||= saved.level >= 3 ? 2 : 1;
-        saved.stageWins ||= { 1: 0, 2: 0, 3: 0 };
-        if (saved.musicOn === undefined) saved.musicOn = true;
-        const needsStageOrders = saved.orders?.some(order => !Number.isFinite(order.remaining));
-        if (needsStageOrders) saved.orders = makeOrders(saved.level || 1, saved.shift || 1, saved.stage);
+    for (const key of [SAVE_KEY, ...OLD_SAVE_KEYS]) {
+      try {
+        const raw = localStorage.getItem(key);
+        const saved = JSON.parse(raw);
+        if (!saved || !Array.isArray(saved.board) || saved.board.length !== COLS * ROWS) continue;
+        saved.board = saved.board.map(p => p && !p.chain && ["item","generator"].includes(p.type) ? {...p, chain:"rice"} : p);
+        // The old key is retained untouched as a rollback copy.
         return saved;
-      }
-      for (const key of OLD_SAVE_KEYS) {
-        const old = JSON.parse(localStorage.getItem(key));
-        if (!old || !Array.isArray(old.board) || old.board.length !== COLS * ROWS) continue;
-        old.board = old.board.map(piece => {
-          if (!piece) return null;
-          if (!piece.chain) return { ...piece, chain: "rice" };
-          return piece;
-        });
-        const empties = old.board.map((v, i) => v ? -1 : i).filter(i => i >= 0);
-        for (const chain of ["noodle", "grill"]) {
-          if (!old.board.some(p => p?.type === "generator" && p.chain === chain) && empties.length) {
-            old.board[empties.shift()] = { type: "generator", chain, cooldown: 0 };
-          }
-        }
-        Object.assign(old, { lives: 3, combo: 0, comboTime: 0, bestCombo: 0, served: 0, shift: 1, score: 0, mergeMeter: 0, gameOver: false, stage: 1, unlockedStage: (old.level || 1) >= 3 ? 2 : 1, stageWins: { 1: 0, 2: 0, 3: 0 }, musicOn: true });
-        old.orders = makeOrders(old.level || 1, 1, 1);
-        return old;
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     return freshState();
   }
+
 
   function save() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
@@ -216,32 +232,34 @@
   function index(c, r) { return r * COLS + c; }
   function cellOf(i) { return { c: i % COLS, r: Math.floor(i / COLS) }; }
 
-  function currentStage() { return stageDefs[state?.stage || 1]; }
-  function shiftTarget() { return currentStage().target; }
-
-  function makeOrder(level, shift, slot = 0, stageNumber = state?.stage || 1) {
-    const stage = stageDefs[stageNumber];
-    const present = state?.board?.filter(p => p?.type === "generator").map(p => p.chain);
-    const availableChains = present?.length ? [...new Set(present)] : ["rice", "noodle", "grill"];
-    const maxLevel = Math.min(4, stageNumber + (shift > 1 ? 1 : 0));
-    const vip = Math.random() < Math.min(.52, .08 + shift * .035 + stage.vipBonus);
-    const count = slot === 2 ? 2 : 1;
-    const items = Array.from({ length: count }, () => ({
-      chain: availableChains[Math.floor(Math.random() * availableChains.length)],
-      level: Math.max(1, Math.floor(Math.random() * (maxLevel + 1))),
+  function makeOrder(_level, _shift, slot = 0) {
+    const available = [...new Set((state?.board || []).filter(p => p?.type === "generator").map(p => p.chain))];
+    const pool = available.length ? available : ["rice", "noodle", "grill"];
+    const rank = state?.shopLevel || 1;
+    const maxLevel = rank >= 8 ? 5 : rank >= 6 ? 4 : rank >= 4 ? 3 : rank >= 2 ? 2 : 1;
+    // Keep one quick order even in the late game; the third slot is a larger menu.
+    const cap = slot === 0 ? Math.min(2, maxLevel) : maxLevel;
+    const count = slot === 2 && rank >= 2 ? 2 : 1;
+    const visitors = regularDefs.map((person, i) => person.level <= rank && pool.includes(person.chain) ? i : -1).filter(i => i >= 0);
+    const customer = visitors.length && slot === 1 && state?.totalOrders > 0 ? visitors[((state.totalOrders || 0) + slot) % visitors.length] : -1;
+    const items = Array.from({length:count}, (_, n) => ({
+      chain: n === 0 && customer >= 0 ? regularDefs[customer].chain : pool[(slot + n + (state?.totalOrders || 0)) % pool.length],
+      level: 1 + Math.floor(Math.random() * cap),
     }));
+    // First orders teach all three producers; regulars join after the first delivery.
+    if (!(state?.totalOrders || 0)) items[0].chain = pool[slot % pool.length];
     const work = items.reduce((sum, item) => sum + 2 ** item.level, 0);
-    const baseTime = Math.max(work * 3.2 + 25, (100 - shift * 5 - (vip ? 24 : 0) + count * 20) * stage.timeRate)
-      + (state?.upgrades?.service || 0) * 8 + (hasPerk("calm") ? 25 : 0);
-    const reward = Math.round((items.reduce((s, item) => s + (item.level + 1) * 17, 0) + count * 10) * (vip ? 1.8 : 1) * stage.rewardRate);
-    return { id: `${Date.now()}-${slot}-${Math.random()}`, items, reward, remaining: baseTime, maxTime: baseTime, vip };
+    const reward = Math.round(24 + work * 10 + count * 8);
+    return {id:`${Date.now()}-${slot}-${Math.random()}`, items, reward, customer};
   }
 
-  function makeOrders(level, shift, stageNumber = state?.stage || 1) {
-    return Array.from({ length: 3 }, (_, i) => makeOrder(level, shift, i, stageNumber));
+  function makeOrders() {
+    return Array.from({length:3}, (_, i) => makeOrder(0, 0, i));
   }
 
-  function xpNeeded() { return 60 + (state.level - 1) * 30; }
+  function orderReward(order) {
+    return Math.round(order.reward * (1 + state.upgrades.service * .05));
+  }
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -354,7 +372,7 @@
       ctx.fillText("🗑️", 0, -size * .04);
       ctx.fillStyle = "#ffd078";
       ctx.font = `800 ${Math.max(8, size * .11)}px sans-serif`;
-      ctx.fillText("清理 15", 0, size * .31);
+      ctx.fillText("免费清理", 0, size * .31);
     } else if (piece.type === "wild") {
       const g = ctx.createRadialGradient(-s * .15, -s * .2, 1, 0, 0, s * .72);
       g.addColorStop(0, "#fff5a8"); g.addColorStop(1, "#8b4cc5");
@@ -424,59 +442,12 @@
   function updateTimers(dt) {
     if (!activePlay()) return;
     state.elapsed += dt;
-    const feverDt = Math.min(dt, state.feverTime);
-    state.feverTime = Math.max(0, state.feverTime - dt);
     hintTime = Math.max(0, hintTime - dt);
-    state.energyClock += dt;
-    if (state.energyClock >= 3) {
-      state.energy = Math.min(120, state.energy + Math.floor(state.energyClock / 3));
-      state.energyClock %= 3;
-    }
-    state.board.forEach(piece => {
-      if (piece?.type === "generator" && piece.cooldown > 0) piece.cooldown = Math.max(0, piece.cooldown - dt - feverDt);
+    state.board.forEach(p => {
+      if (p?.type === "generator" && p.cooldown > 0) p.cooldown = Math.max(0, p.cooldown - dt);
     });
-    if (state.comboTime > 0) {
-      state.comboTime = Math.max(0, state.comboTime - dt);
-      if (state.comboTime === 0) state.combo = 0;
-    }
-    let expired = -1;
-    state.orders.forEach((order, i) => {
-      order.remaining -= dt;
-      if (order.remaining <= 0 && expired < 0) expired = i;
-    });
-    if (expired >= 0) expireOrder(expired);
-    uiClock += dt;
     saveClock += dt;
-    if (uiClock >= .2) {
-      uiClock = 0;
-      renderTimers();
-    }
-    if (saveClock >= 5) {
-      saveClock = 0;
-      save();
-    }
-    activateFever();
-  }
-
-  function expireOrder(orderIndex) {
-    state.lives--;
-    state.mistakes++;
-    state.combo = 0;
-    state.comboTime = 0;
-    addTrash();
-    if (state.lives <= 0) {
-      finishRun(false);
-      return;
-    }
-    state.orders[orderIndex] = makeOrder(state.level, state.shift, orderIndex);
-    showToast("食客等不及走了，棋盘多了一袋垃圾");
-    softTick(90);
-    afterChange();
-  }
-
-  function addTrash() {
-    const empties = state.board.map((v, i) => v ? -1 : i).filter(i => i >= 0);
-    if (empties.length) state.board[empties[Math.floor(Math.random() * empties.length)]] = { type: "trash" };
+    if (saveClock >= 5) { saveClock = 0; save(); }
   }
 
   function point(e) {
@@ -525,8 +496,6 @@
     drag = null;
     if (!activePlay()) return;
     if (!moved && piece.type === "trash") {
-      if (state.coins < 15) { showToast("需要 15 金币才能清理垃圾"); return; }
-      state.coins -= 15;
       state.board[source] = null;
       burstAt(source, "#9ad8cf");
       showToast("垃圾清理完毕");
@@ -558,21 +527,11 @@
       state.board[source] = null;
       state.board[target] = { type: "item", chain: base.chain, level: base.level + 1 };
       selectedCell = target;
-      state.xp += 5 + base.level * 2;
-      state.mergeMeter = (state.mergeMeter || 0) + 1;
       state.merges++;
-      state.heat = Math.min(12, state.heat + 1);
       burstAt(target);
       softTick(620);
-      if (state.mergeMeter >= 7) {
-        state.mergeMeter = 0;
-        spawnWild(Math.min(2, base.level));
-      } else {
-        showToast(`合成 ${chains[base.chain][base.level + 1].name} · 百搭酱 ${state.mergeMeter}/7`);
-      }
-      checkLevel();
       discover(state.board[target]);
-      activateFever();
+
     } else {
       state.board[source] = there; state.board[target] = piece;
       softTick(240);
@@ -591,19 +550,12 @@
     return false;
   }
 
-  function spawnWild(level) {
-    const open = state.board.findIndex(p => !p);
-    if (open < 0) { showToast("百搭酱已就绪，但棋盘没有空位"); return; }
-    state.board[open] = { type: "wild", level };
-    burstAt(open, "#e9a7ff");
-    showToast("七连合成！获得一份百搭酱");
-  }
+
 
   function produce(generatorIndex) {
     const generator = state.board[generatorIndex];
     if (!activePlay() || generator?.type !== "generator") return;
     if ((generator.cooldown || 0) > 0) { showToast(`摊位备料中，还要 ${generator.cooldown.toFixed(1)} 秒`); softTick(110); return; }
-    if (state.energy <= 0 && state.feverTime <= 0) { showToast("体力不够，3 秒恢复 1 点；交单也能补充"); softTick(100); return; }
     const empties = state.board.map((v, i) => v ? -1 : i).filter(i => i >= 0);
     if (!empties.length) { showToast("棋盘满了，先合成或完成订单吧"); return; }
     const { c: gc, r: gr } = cellOf(generatorIndex);
@@ -612,10 +564,9 @@
       return Math.abs(aa.c - gc) + Math.abs(aa.r - gr) - Math.abs(bb.c - gc) - Math.abs(bb.r - gr);
     });
     const target = empties[0];
-    const level = Math.random() < Math.min(.6, .08 + (hasPerk("quality") ? .25 : 0)) ? 1 : 0;
+    const level = Math.random() < .08 + state.upgrades.supply * .05 ? 1 : 0;
     state.board[target] = { type: "item", chain: generator.chain, level };
-    if (state.feverTime <= 0) state.energy--;
-    generator.cooldown = 2 * (1 - state.upgrades.stove * .1) * (hasPerk("speed") ? .65 : 1);
+    generator.cooldown = .55 * (1 - state.upgrades.stove * .1);
     discover(state.board[target]);
     burstAt(target, "#ff9f57");
     softTick(440);
@@ -637,14 +588,7 @@
     return order.items.map(item => ({ ...item, ready: counts[`${item.chain}:${item.level}`]-- > 0 }));
   }
 
-  function activateFever() {
-    if (state.heat < 12 || state.feverTime > 0) return;
-    state.heat = 0;
-    state.feverTime = 15;
-    state.board.forEach(p => { if (p?.type === "generator") p.cooldown = 0; });
-    showToast("旺火 15 秒！免费出食材 · 双倍备料速度");
-    softTick(880);
-  }
+
 
   function findMerge() {
     if (!activePlay()) return;
@@ -664,7 +608,7 @@
 
   function renderGuidance() {
     if (!state.orders.some(order => order.id === trackedOrder)) {
-      trackedOrder = state.orders.reduce((best, order) => !best || order.remaining < best.remaining ? order : best, null)?.id;
+      trackedOrder = state.orders.find(canComplete)?.id || state.orders[0]?.id;
     }
     const order = state.orders.find(order => order.id === trackedOrder);
     if (!order) return;
@@ -681,10 +625,8 @@
     const free = state.board.filter(p => !p).length;
     $("spaceCopy").textContent = `空位 ${free}`;
     $("spaceCopy").classList.toggle("low-space", free < 7);
-    $("shiftBar").style.width = `${Math.min(100, state.totalServed / (shiftTarget() * 2) * 100)}%`;
-    $("heatCopy").textContent = state.feverTime > 0 ? `🔥 旺火 ${Math.ceil(state.feverTime)}s` : `炉火 ${state.heat}/12`;
-    $("heatBar").style.width = `${(state.feverTime > 0 ? state.feverTime / 15 : state.heat / 12) * 100}%`;
-    $("heatCopy").classList.toggle("fever", state.feverTime > 0);
+    const next = nextShop();
+    $("shiftBar").style.width = `${next ? Math.min(100, state.totalOrders / next.orders * 100) : 100}%`;
   }
 
   function fulfill(orderIndex) {
@@ -702,73 +644,29 @@
       state.board[i] = null;
       burstAt(i, "#7df1a4");
     });
-    state.combo = state.comboTime > 0 ? Math.min(8, state.combo + 1) : 1;
-    state.comboTime = hasPerk("combo") ? 35 : 18;
-    state.runCombo = Math.max(state.runCombo, state.combo);
-    state.bestCombo = Math.max(state.bestCombo || 0, state.combo);
-    const multiplier = 1 + Math.max(0, state.combo - 1) * .2;
-    const earned = Math.round(order.reward * multiplier * (hasPerk("tips") ? 1.3 : 1));
+    const earned = orderReward(order);
     state.coins += earned;
-    state.score += earned + (order.vip ? 80 : 0);
-    state.xp += 18 + order.items.length * 8;
-    state.energy = Math.min(120, state.energy + 6 + state.upgrades.supply * 2);
-    state.served++;
-    state.totalServed++;
-    state.orders[orderIndex] = makeOrder(state.level, state.shift, orderIndex);
-    showToast(`${order.vip ? "贵客满意！" : "上菜成功"} +${earned} · ${state.combo} 连击`);
-    softTick(760);
-    checkLevel();
-    if (state.served >= shiftTarget()) completeShift();
-    afterChange();
-  }
-
-  function completeShift() {
-    const bonus = 100 + state.shift * 45;
-    state.coins += bonus;
-    state.score += bonus * 2;
-    state.stageWins[state.stage] = (state.stageWins[state.stage] || 0) + 1;
-    if (state.shift >= 2) { finishRun(true); return; }
-    state.shift++;
-    state.served = 0;
-    state.lives = Math.min(currentStage().lives, state.lives + 1);
-    state.energy = Math.min(120, state.energy + 18);
-    const pool = Object.keys(perkDefs).filter(key => !hasPerk(key));
-    state.offers = [];
-    while (state.offers.length < 3 && pool.length) state.offers.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    showPerks();
-    for (let n = 0; n < Math.min(2, state.shift - 1); n++) addTrash();
-  }
-
-  function selectStage(stageNumber) {
-    if (stageNumber > state.unlockedStage) {
-      $("homeTip").textContent = "先在上一关完成两轮营业，才能解锁这里。";
-      return;
-    }
-    if (state.stage === stageNumber && !state.gameOver) return;
-    if (!state.gameOver && (state.elapsed > 0 || state.served > 0)) {
-      if (!confirm("切换关卡将开始新一局。金币、升级和收藏会保留，当前棋盘与本局得分会重置。")) return;
-    }
-    beginRun(stageNumber);
-    $("homeTip").textContent = `${currentStage().desc}。订单倒计时在主页暂停。`;
-    afterChange();
-  }
-
-  function checkLevel() {
-    let needed = xpNeeded();
-    while (state.xp >= needed) {
-      state.xp -= needed;
-      state.level++;
-      state.energy = Math.min(120, state.energy + 25);
-      state.coins += state.level * 20;
-      if (state.level === 3 && !state.board.some(p => p?.type === "generator" && p.chain === "sweet")) {
-        const open = state.board.findIndex(p => !p);
-        if (open >= 0) state.board[open] = { type: "generator", chain: "sweet" };
-        showToast("茶饮铺解锁！新的甜品菜系加入夜市");
+    state.totalOrders++;
+    state.totalServed = state.totalOrders;
+    let message = `上菜啦！+${earned} 金币 · 累计招待 ${state.totalOrders} 位食客`;
+    const person = regularDefs[order.customer];
+    if (person) {
+      state.regulars[order.customer] = (state.regulars[order.customer] || 0) + 1;
+      if (state.regulars[order.customer] % 5 === 0) {
+        state.coins += 80;
+        message = `${person.name}送来谢礼 +80 金币：“${person.line}”`;
       }
-      showToast(`夜市升到 ${state.level} 级！体力 +25`);
-      needed = xpNeeded();
     }
+    if (state.totalOrders % 10 === 0) {
+      state.coins += 120;
+      message += " · 十单心意 +120";
+    }
+    state.orders[orderIndex] = makeOrder(0, 0, orderIndex);
+    showToast(message);
+    softTick(760);
+    afterChange();
   }
+
 
   function afterChange(keepSale = false) {
     if (!keepSale) undoSale = null;
@@ -782,107 +680,74 @@
     $("gameShell").classList.toggle("at-home", atHome);
     document.querySelectorAll(".game-shell > header, .game-shell > .orders-wrap, .game-shell > .board-wrap, .game-shell > .tool-tray, .game-shell > footer").forEach(el => { el.inert = atHome; });
     $("coinValue").textContent = state.coins;
-    $("energyValue").textContent = state.energy;
-    $("levelValue").textContent = state.level;
-    $("livesValue").textContent = "♥".repeat(Math.max(0, state.lives)) + "♡".repeat(Math.max(0, 3 - state.lives));
-    $("shiftValue").textContent = `${currentStage().name} · ${state.served}/${shiftTarget()}`;
-    $("comboValue").textContent = state.combo > 1 ? `${state.combo} 连击 · ${Math.ceil(state.comboTime)}s` : `百搭酱 ${state.mergeMeter}/7`;
-    $("comboValue").classList.toggle("hot", state.combo > 1);
-    $("homeLevel").textContent = state.level;
+    $("levelValue").textContent = state.shopLevel;
+    $("shiftValue").textContent = "不催单 · 慢慢做";
+    $("homeLevel").textContent = state.shopLevel;
     $("homeCoins").textContent = state.coins;
-    $("homeCombo").textContent = state.bestCombo || 0;
-    $("homeProgress").textContent = state.gameOver ? `本局得分 ${state.score}` : `${currentStage().name} · ${state.served}/${shiftTarget()} 单`;
-    $("startGameBtn").querySelector("span").textContent = state.gameOver ? "查看结算" : (state.introduced ? "继续营业" : "开始营业");
-    $("homeGreeting").textContent = state.gameOver ? "今晚已经打烊，来看看经营成绩" : (state.shift > 1 ? `已经守到第 ${state.shift} 轮，街上越来越热闹` : "掌柜，今晚也要准时开张");
-    document.querySelectorAll(".level-card").forEach(card => {
-      const n = Number(card.dataset.stage);
-      const locked = n > state.unlockedStage;
-      card.classList.toggle("selected", n === state.stage);
-      card.classList.toggle("locked", locked);
-      const stars = state.records[n]?.stars || 0;
-      card.querySelector("span small").textContent = `${stageDefs[n].target} 单/轮 · ${stageDefs[n].lives} 耐心${state.records[n] ? ` · 最高 ${state.records[n].score} 分` : ""}`;
-      card.querySelector("em").textContent = locked ? "未解锁" : (stars ? "★".repeat(stars) : (n === state.stage ? "已选择" : "可挑战"));
-      card.setAttribute("aria-label", `${stageDefs[n].name}，${stageDefs[n].desc}，${locked ? "未解锁" : n === state.stage ? "已选择" : "可挑战"}`);
-    });
+    $("homeServed").textContent = state.totalOrders;
+    $("homeProgress").textContent = `${currentShop().name} · 已招待 ${state.totalOrders} 位食客`;
+    $("startGameBtn").querySelector("span").textContent = state.introduced ? "去小店做菜" : "开张，做第一道菜";
+    $("homeGreeting").textContent = "不用赶时间，小店会陪你慢慢长大";
+    $("shopName").textContent = currentShop().name;
+    $("shopScene").dataset.rank = String(state.shopLevel);
+    $("shopScene").classList.toggle("has-windows", state.shopLevel >= 4);
+    $("shopScene").classList.toggle("has-courtyard", state.shopLevel >= 6);
+    $("shopDecor").innerHTML = Object.entries(decorDefs).filter(([key]) => state.decorations[key])
+      .map(([,def]) => `<span title="${def.name}" aria-label="${def.name}">${def.icon}</span>`).join("");
+    $("shopDecor").classList.toggle("empty", !Object.keys(state.decorations).length);
+    const next = nextShop();
+    $("growthGoal").textContent = next ? `下一步：${next.name}` : "夜市地标 · 把小店经营成回忆";
+    $("growthCopy").textContent = next ? `累计招待 ${Math.min(state.totalOrders,next.orders)}/${next.orders} 位食客 · 扩建 ${next.cost} 金币` : `已招待 ${state.totalOrders} 位食客，菜谱和常客故事继续积累。`;
+    $("growthBar").style.width = `${next ? Math.min(100,state.totalOrders / next.orders * 100) : 100}%`;
+    $("openGrowthBtn").textContent = expansionReady() ? "可以扩建啦 →" : "查看成长与装修 →";
+    $("openGrowthBtn").classList.toggle("can-expand", expansionReady());
+    $("xpCopy").textContent = next ? `${Math.min(state.totalOrders,next.orders)} / ${next.orders} 位` : `${state.totalOrders} 位`;
+    $("xpBar").style.width = `${next ? Math.min(100,state.totalOrders / next.orders * 100) : 100}%`;
     syncSoundUI();
     renderTools();
     renderGuidance();
-    $("xpCopy").textContent = `${state.xp} / ${xpNeeded()}`;
-    $("xpBar").style.width = `${Math.min(100, state.xp / xpNeeded() * 100)}%`;
+    renderGrowth();
+
     const orders = $("orders");
     orders.innerHTML = "";
     state.orders.forEach((order, i) => {
       const ready = canComplete(order);
       const btn = document.createElement("button");
-      const urgent = order.remaining / order.maxTime < .28;
-      btn.className = `order-card${ready ? " ready" : ""}${order.vip ? " vip" : ""}${urgent ? " urgent" : ""}${order.id === trackedOrder ? " tracked" : ""}`;
+      btn.className = `order-card${ready ? " ready" : ""}${order.id === trackedOrder ? " tracked" : ""}`;
       const names = order.items.map(item => chains[item.chain][item.level].name);
-      btn.setAttribute("aria-label", `${order.vip ? "贵客，" : ""}${names.join("、")}，剩余${Math.ceil(order.remaining)}秒，奖励${order.reward}金币${ready ? "，可以交付" : ""}`);
-      btn.innerHTML = `${order.vip ? '<span class="vip-tag">贵客</span>' : ''}<span class="order-check">✓</span><div class="order-items">${orderInventory(order).map(item => { const def = chains[item.chain][item.level]; return `<span class="${item.ready ? "ingredient-ready" : ""}" title="${def.name}">${def.emoji}<small>${item.ready ? "✓ " : ""}${def.name}</small></span>`; }).join("")}</div><div class="order-reward"><span>●</span>${order.reward}<em>${Math.ceil(order.remaining)}s</em></div><div class="timer-track"><i style="width:${Math.max(0, order.remaining / order.maxTime * 100)}%"></i></div><div class="order-action">${ready ? "点击出餐" : order.id === trackedOrder ? "正在备菜" : "点击追踪"}</div>`;
+      const person = regularDefs[order.customer];
+      btn.setAttribute("aria-label", `${person?.name || "街坊"}：${names.join("、")}，奖励${orderReward(order)}金币${ready ? "，可以交付" : "，不限时"}`);
+      btn.innerHTML = `<div class="customer-name">${person?.icon || "🙂"} ${person?.name || "街坊"}</div><span class="order-check">✓</span><div class="order-items">${orderInventory(order).map(item => { const def = chains[item.chain][item.level]; return `<span class="${item.ready ? "ingredient-ready" : ""}" title="${def.name}">${def.emoji}<small>${item.ready ? "✓ " : ""}${def.name}</small></span>`; }).join("")}</div><div class="order-reward"><span>●</span>${orderReward(order)}</div><div class="order-action">${ready ? "做好了，交给食客" : order.id === trackedOrder ? "正在备菜" : "点我看做法"}</div>`;
+
       btn.addEventListener("click", () => fulfill(i));
       orders.appendChild(btn);
     });
   }
 
-  function renderTimers() {
-    renderGuidance();
-    $("energyValue").textContent = state.energy;
-    $("comboValue").textContent = state.combo > 1 ? `${state.combo} 连击 · ${Math.ceil(state.comboTime)}s` : `百搭酱 ${state.mergeMeter}/7`;
-    $("comboValue").classList.toggle("hot", state.combo > 1);
-    document.querySelectorAll(".order-card").forEach((card, i) => {
-      const order = state.orders[i];
-      card.querySelector("em").textContent = `${Math.max(0, Math.ceil(order.remaining))}s`;
-      card.setAttribute("aria-label", `${order.items.map(p => chains[p.chain][p.level].name).join("、")}，剩余${Math.max(0, Math.ceil(order.remaining))}秒，奖励${order.reward}金币${canComplete(order) ? "，可以交付" : ""}`);
-      card.querySelector(".timer-track i").style.width = `${Math.max(0, order.remaining / order.maxTime * 100)}%`;
-      card.classList.toggle("urgent", order.remaining / order.maxTime < .28);
-    });
+  function renderGrowth() {
+    const next = nextShop();
+    $("growthWallet").textContent = `持有 ${state.coins} 金币 · 店铺 Lv.${state.shopLevel}`;
+    $("expansionName").textContent = next ? `扩建为「${next.name}」` : "你的小店已成为夜市地标";
+    $("expansionDesc").textContent = next?.unlock || "没有强制结局，继续招待食客、装点小店、收集所有菜谱。";
+    $("expansionRequirements").textContent = next ? `食客 ${state.totalOrders}/${next.orders} 位 · 金币 ${state.coins}/${next.cost}` : `累计招待 ${state.totalOrders} 位食客`;
+    $("expandBtn").disabled = !expansionReady();
+    $("expandBtn").textContent = !next ? "店铺已满级，继续经营" : expansionReady() ? `花 ${next.cost} 金币扩建` : state.totalOrders < next.orders ? `再招待 ${next.orders-state.totalOrders} 位食客` : `还差 ${next.cost-state.coins} 金币`;
+    $("growthRoad").innerHTML = shopDefs.map((shop,i) => `<li class="${i+1 <= state.shopLevel ? "reached" : ""}"><b>${i+1}. ${shop.name}</b><small>${i+1 === state.shopLevel ? "现在的小店" : i+1 < state.shopLevel ? "已完成" : `${shop.orders} 位食客 · ${shop.cost} 金币`}</small></li>`).join("");
+    $("decorationList").innerHTML = Object.entries(decorDefs).map(([key,def]) => {
+      const owned = state.decorations[key], locked = state.shopLevel < def.level;
+      return `<button data-decor="${key}" ${owned || locked || state.coins < def.cost ? "disabled" : ""}><span>${def.icon}</span><b>${def.name}</b><small>${owned ? "已摆放" : locked ? `店铺 Lv.${def.level} 解锁` : `${def.cost} 金币`}</small></button>`;
+    }).join("");
+    $("decorationList").querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => buyDecoration(btn.dataset.decor)));
+    $("regularList").innerHTML = regularDefs.map((person,i) => {
+      const visits = state.regulars[i] || 0, unlocked = state.shopLevel >= person.level;
+      return `<section class="regular-card"><span>${person.icon}</span><div><b>${person.name}</b><small>${unlocked ? `已招待 ${visits} 次 · 每 5 次送 80 金币谢礼` : `店铺 Lv.${person.level} 来访`}</small><p>${unlocked ? person.line : "期待与你的小店相遇"}</p><em>${"♥".repeat(Math.min(5,Math.floor(visits/5)))}${"♡".repeat(5-Math.min(5,Math.floor(visits/5)))}</em></div></section>`;
+    }).join("");
   }
 
-  function showPerks() {
-    $("perkChoices").innerHTML = state.offers.map(key => `<button data-perk="${key}"><b>${perkDefs[key].name}</b><small>${perkDefs[key].text}</small></button>`).join("");
-    $("perkChoices").querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => choosePerk(btn.dataset.perk)));
-    if (!$("perkDialog").open) $("perkDialog").showModal();
-  }
-
-  function choosePerk(key) {
-    if (!state.offers.includes(key)) return;
-    state.perks.push(key);
-    state.offers = [];
-    state.orders = makeOrders(state.level, state.shift, state.stage);
-    state.combo = 0;
-    state.comboTime = 0;
-    $("perkDialog").close();
-    afterChange();
-  }
-
-  function finishRun(won) {
-    state.gameOver = true;
-    state.won = won;
-    state.offers = [];
-    drag = null;
-    const stars = won ? 1 + Number(state.mistakes === 0) + Number(state.mistakes === 0 && state.runCombo >= 3) : 0;
-    if (won) {
-      state.unlockedStage = Math.min(3, Math.max(state.unlockedStage, state.stage + 1));
-      const record = state.records[state.stage] || { stars: 0, score: 0 };
-      state.records[state.stage] = { stars: Math.max(stars, record.stars), score: Math.max(state.score, record.score) };
-    }
-    state.resultStars = stars;
-    showResult();
-    afterChange();
-  }
-
-  function showResult() {
-    $("endTitle").textContent = state.won ? "夜市挑战通关！" : "今晚打烊了";
-    $("endText").textContent = state.won ? `${"★".repeat(state.resultStars || 1)} · 通关得一星；零失误再一星；零失误且三连单得三星。` : "金币、升级与收藏已保留。调整经营路线，再试一次。";
-    $("finalScore").textContent = state.score;
-    $("finalShift").textContent = state.shift;
-    const minutes = Math.floor(state.elapsed / 60);
-    const seconds = Math.floor(state.elapsed % 60).toString().padStart(2, "0");
-    $("resultAdvice").textContent = `用时 ${minutes}:${seconds} · 出餐 ${state.totalServed} 单 · 合成 ${state.merges} 次 · 最佳 ${state.runCombo} 连单。` +
-      (state.mistakes > 0 ? "下次先追踪急单，及时使用换单与救场。" : state.runCombo < 3 ? "想拿三星？提前备好三份订单，再连续交付。" : "节奏掌握得不错，试试更热闹的夜市！");
-    $("nextStageBtn").hidden = !state.won || state.stage >= 3;
-    $("restartBtn").textContent = state.won ? "再战本关 · 冲刺纪录" : "重新开张";
-    if (!$("endDialog").open) $("endDialog").showModal();
+  function openGrowth() {
+    $("growthNotice").textContent = "";
+    renderGrowth();
+    $("growthDialog").showModal();
   }
 
   function renderTools() {
@@ -890,15 +755,12 @@
     $("selectionInfo").textContent = piece?.type === "item" ? `${chains[piece.chain][piece.level].name} · L${piece.level + 1} · 点金色同类合成 / 点空格移动` : piece?.type === "wild" ? `百搭酱 L${piece.level + 1} · 点同等级食材合成` : "点订单看路线 · 点两份相同食材合成";
     $("sellBtn").disabled = (!undoSale && piece?.type !== "item") || !activePlay();
     $("sellBtn").textContent = undoSale ? "撤销出售" : piece?.type === "item" ? `出售 +${piece.level + 1}` : "出售";
-    $("splitBtn").disabled = piece?.type !== "item" || piece.level === 0 || state.splits <= 0 || !activePlay();
-    $("splitBtn").textContent = `拆分 (${state.splits})`;
-    $("skipBtn").textContent = `换急单 (${state.discards})`;
-    $("skipBtn").disabled = state.discards <= 0 || !activePlay();
-    $("rescueBtn").title = `全场 +12 秒 · ${30 + state.rescues * 20} 金币`;
-    $("rescueBtn").querySelector("span").textContent = `${30 + state.rescues * 20}币`;
+    $("skipBtn").textContent = "免费换单";
+    $("skipBtn").disabled = !activePlay();
     $("hintBtn").disabled = !activePlay();
-    $("runSummary").textContent = `第 ${state.shift}/2 轮 · ${state.served}/${shiftTarget()} 单 · ${state.score} 分`;
-    $("perkSummary").textContent = state.perks.length ? state.perks.map(key => perkDefs[key].name).join(" · ") : "通过首轮，选择一项经营能力";
+    const next = nextShop();
+    $("runSummary").textContent = next ? `扩建目标 · 食客 ${Math.min(state.totalOrders,next.orders)}/${next.orders}` : `累计招待 ${state.totalOrders} 位食客`;
+    $("perkSummary").textContent = expansionReady() ? "回小店就能扩建啦" : `每 10 单送心意 · ${state.totalOrders % 10}/10`;
   }
 
   function sellSelected() {
@@ -923,16 +785,7 @@
     showToast("已出售，下一次棋盘操作前可以撤销");
   }
 
-  function splitSelected() {
-    const piece = state.board[selectedCell];
-    const open = state.board.findIndex(p => !p);
-    if (!activePlay() || piece?.type !== "item" || piece.level < 1 || state.splits <= 0) return;
-    if (open < 0) { showToast("拆分需要一个空格"); return; }
-    piece.level--;
-    state.board[open] = { ...piece };
-    state.splits--;
-    afterChange();
-  }
+
 
   function renderWorkshop() {
     $("workshopCoins").textContent = `持有 ${state.coins} 金币 · 永久生效，最高 3 级`;
@@ -1010,10 +863,8 @@
   $("recipeBtn").addEventListener("click", () => { renderCollection(); $("recipeDialog").showModal(); });
   $("recipeDialog").querySelectorAll(".recipe-close,.recipe-ok").forEach(b => b.addEventListener("click", () => $("recipeDialog").close()));
   $("startGameBtn").addEventListener("click", () => {
-    if (state.gameOver) { showResult(); return; }
     $("homeScreen").classList.add("hidden");
     $("homeScreen").inert = true;
-    if (state.offers.length) showPerks();
     renderUI();
     startMusic();
     softTick(540);
@@ -1032,68 +883,17 @@
   $("effectsToggle").addEventListener("click", () => { state.effectsOn = !state.effectsOn; startMusic().then(() => softTick(620)); save(); });
   $("musicVolume").addEventListener("input", e => { state.musicVolume = Number(e.target.value) / 100; startMusic(); save(); });
   $("audioPreview").addEventListener("click", () => { startMusic().then(() => softTick(760)); });
-  document.querySelectorAll(".level-card").forEach(card => card.addEventListener("click", () => selectStage(Number(card.dataset.stage))));
-  $("rescueBtn").addEventListener("click", () => {
-    if (!activePlay()) return;
-    const cost = 30 + state.rescues * 20;
-    if (state.coins < cost) { showToast(`救场需要 ${cost} 金币`); softTick(100); return; }
-    state.coins -= cost;
-    state.rescues++;
-    state.orders.forEach(order => {
-      order.remaining += 12;
-      order.maxTime = Math.max(order.maxTime, order.remaining);
-    });
-    state.board.forEach(piece => { if (piece?.type === "generator") piece.cooldown = 0; });
-    showToast("全场订单 +12 秒，摊位立即备好");
-    softTick(520);
-    afterChange();
-  });
-  $("resetBtn").addEventListener("click", () => {
-    if (!confirm("重新挑战本关？当前棋盘会重置，金币、永久升级和收藏保留。")) return;
-    beginRun(state.stage);
-    showToast("夜市重新开张啦");
-  });
-  $("restartBtn").addEventListener("click", () => {
-    const retryStage = state.stage;
-    $("endDialog").close();
-    beginRun(retryStage);
-    $("homeScreen").classList.add("hidden");
-    $("homeScreen").inert = true;
-    renderUI();
-    showToast("新的一晚开始了");
-  });
+  $("openGrowthBtn").addEventListener("click", openGrowth);
+  $("growthGameBtn").addEventListener("click", openGrowth);
+  $("expandBtn").addEventListener("click", expandShop);
+  $("growthClose").addEventListener("click", () => $("growthDialog").close());
 
   $("workshopBtn").addEventListener("click", () => { renderWorkshop(); $("workshopDialog").showModal(); });
   $("workshopClose").addEventListener("click", () => $("workshopDialog").close());
   $("sellBtn").addEventListener("click", sellSelected);
   $("hintBtn").addEventListener("click", findMerge);
-  $("splitBtn").addEventListener("click", splitSelected);
-  $("skipBtn").addEventListener("click", () => {
-    if (!activePlay() || state.discards <= 0) return;
-    const i = state.orders.reduce((best, order, n) => order.remaining < state.orders[best].remaining ? n : best, 0);
-    state.orders[i] = makeOrder(state.level, state.shift, i);
-    state.discards--;
-    showToast("已更换最紧急订单，不扣耐心");
-    afterChange();
-  });
-  $("endHomeBtn").addEventListener("click", () => {
-    $("endDialog").close();
-    $("homeScreen").classList.remove("hidden");
-    $("homeScreen").inert = false;
-    renderUI();
-  });
-  $("nextStageBtn").addEventListener("click", () => {
-    if (!state.won || state.stage >= 3) return;
-    const nextStage = state.stage + 1;
-    $("endDialog").close();
-    beginRun(nextStage);
-    $("homeScreen").classList.add("hidden");
-    $("homeScreen").inert = true;
-    renderUI();
-    startMusic();
-  });
-  $("perkDialog").addEventListener("cancel", e => e.preventDefault());
-  $("endDialog").addEventListener("cancel", e => { e.preventDefault(); $("endHomeBtn").click(); });
+  $("skipBtn").addEventListener("click", swapOrder);
+
   document.addEventListener("visibilitychange", () => {
     drag = null; lastTime = performance.now(); save();
     if (document.hidden) audio.stop();
@@ -1107,8 +907,10 @@
   state = load();
   normalizeProgress();
   ensureProducers();
+  if (!Array.isArray(state.orders) || state.orders.length !== 3 || state.orders.some(order => "remaining" in order)) state.orders = makeOrders();
   if (state.introduced) $("guide").classList.add("hidden");
   resize();
   renderUI();
+  save();
   requestAnimationFrame(animate);
 })();
